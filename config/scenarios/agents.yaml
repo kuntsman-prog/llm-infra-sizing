@@ -1,0 +1,20 @@
+name: Агентная платформа
+description: >
+  300 пользователей ставят агентам задачи; каждая задача это в среднем 6 вызовов модели
+  с длинным контекстом (история, результаты инструментов). Нужна сильная модель.
+model: qwen2.5-72b
+quant: fp8
+kv_dtype: fp8
+users: 300
+requests_per_user_per_day: 10
+llm_calls_per_request: 6
+peak_hour_share: 0.2
+avg_prompt_tokens: 12000
+avg_output_tokens: 500
+target_ttft_s: 5.0
+target_tpot_ms: 50
+ha: true
+always_on: true
+# Ориентир цены API для моделей класса 70B; подставьте цены провайдера
+api_usd_per_m_input: 1.0
+api_usd_per_m_output: 3.0

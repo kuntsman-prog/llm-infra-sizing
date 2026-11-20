@@ -1,0 +1,17 @@
+name: Корпоративный ассистент с RAG
+description: >
+  Ассистент по внутренним документам для 2 000 сотрудников. Промпт включает найденные
+  фрагменты документов, поэтому он длинный. Ответ читается человеком, скорость генерации
+  должна быть быстрее чтения.
+model: qwen2.5-32b
+quant: int4
+kv_dtype: fp16
+users: 2000
+requests_per_user_per_day: 15
+peak_hour_share: 0.2
+avg_prompt_tokens: 3000
+avg_output_tokens: 350
+target_ttft_s: 2.0
+target_tpot_ms: 60
+ha: true
+always_on: true

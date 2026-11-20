@@ -1,0 +1,77 @@
+# Паспортные характеристики GPU (ориентировочно) и экономика.
+# vram_gb: память; bandwidth_tbs: пропускная способность памяти, ТБ/с;
+# fp16_tflops: плотная производительность FP16/BF16 на тензорных ядрах без учёта разреженности;
+# tdp_w: потребление; interconnect: nvlink или pcie (связь GPU внутри сервера);
+# production: false, если карта не подходит для промышленного размещения в ЦОД.
+# ЦЕНЫ ОРИЕНТИРОВОЧНЫЕ и зависят от рынка, поставщика и страны. Перед любым решением
+# замените их на актуальные коммерческие предложения.
+#   price_usd: цена GPU; platform_usd_per_gpu: доля сервера (CPU, RAM, NVMe, сеть) на один GPU;
+#   cloud_usd_per_hour: аренда одного GPU в облаке.
+gpus:
+  rtx-4090:
+    vram_gb: 24
+    bandwidth_tbs: 1.0
+    fp16_tflops: 165
+    tdp_w: 450
+    price_usd: 2000
+    platform_usd_per_gpu: 1500
+    cloud_usd_per_hour: 0.5
+    interconnect: pcie
+    production: false
+    note: потребительская карта; лицензия драйвера GeForce не разрешает размещение в ЦОД, только стенды
+  l4:
+    vram_gb: 24
+    bandwidth_tbs: 0.3
+    fp16_tflops: 121
+    tdp_w: 72
+    price_usd: 3000
+    platform_usd_per_gpu: 1500
+    cloud_usd_per_hour: 0.6
+    interconnect: pcie
+  l40s:
+    vram_gb: 48
+    bandwidth_tbs: 0.864
+    fp16_tflops: 362
+    tdp_w: 350
+    price_usd: 9000
+    platform_usd_per_gpu: 3000
+    cloud_usd_per_hour: 1.2
+    interconnect: pcie
+  a100-80gb:
+    vram_gb: 80
+    bandwidth_tbs: 2.0
+    fp16_tflops: 312
+    tdp_w: 400
+    price_usd: 15000
+    platform_usd_per_gpu: 6000
+    cloud_usd_per_hour: 1.8
+    interconnect: nvlink
+  h100-sxm:
+    vram_gb: 80
+    bandwidth_tbs: 3.35
+    fp16_tflops: 989
+    tdp_w: 700
+    price_usd: 30000
+    platform_usd_per_gpu: 8000
+    cloud_usd_per_hour: 3.0
+    interconnect: nvlink
+  h200:
+    vram_gb: 141
+    bandwidth_tbs: 4.8
+    fp16_tflops: 989
+    tdp_w: 700
+    price_usd: 35000
+    platform_usd_per_gpu: 8000
+    cloud_usd_per_hour: 4.0
+    interconnect: nvlink
+
+economics:
+  years: 3
+  electricity_usd_per_kwh: 0.10
+  pue: 1.5                    # энергоэффективность ЦОД
+  server_power_overhead: 1.6  # CPU, память, сеть, вентиляторы относительно TDP GPU
+  maintenance_share_per_year: 0.10
+  # Цена API за 1 млн токенов по умолчанию, ориентир для моделей класса 30B;
+  # в сценарии можно задать свою цену под класс модели. Подставьте цены провайдера.
+  api_usd_per_m_input: 0.50
+  api_usd_per_m_output: 1.50

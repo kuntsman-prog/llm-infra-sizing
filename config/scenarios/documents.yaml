@@ -1,0 +1,18 @@
+name: Пакетная проверка документов
+description: >
+  5 000 документов в день, на каждый 8 вызовов модели (разбор разделов и проверки).
+  Пользователь не ждёт ответа в реальном времени, поэтому требования к задержке мягкие.
+  Работа только в рабочие часы, резерв не нужен: при сбое пакет дообрабатывается позже.
+model: qwen3-30b-a3b
+quant: fp16
+kv_dtype: fp16
+users: 5000
+requests_per_user_per_day: 1
+llm_calls_per_request: 8
+peak_hour_share: 0.15
+avg_prompt_tokens: 6000
+avg_output_tokens: 400
+target_ttft_s: 30
+target_tpot_ms: 200
+ha: false
+always_on: false

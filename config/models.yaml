@@ -1,0 +1,62 @@
+# Архитектурные параметры моделей из config.json на Hugging Face.
+# params_b: всего параметров, млрд; active_params_b: активных на токен (для MoE меньше общего).
+# Перед расчётом для реального проекта сверьте значения с config.json выбранной модели.
+models:
+  qwen2.5-7b:
+    params_b: 7.6
+    active_params_b: 7.6
+    layers: 28
+    attention_heads: 28
+    kv_heads: 4
+    head_dim: 128
+    max_context: 131072
+  llama-3.1-8b:
+    params_b: 8.0
+    active_params_b: 8.0
+    layers: 32
+    attention_heads: 32
+    kv_heads: 8
+    head_dim: 128
+    max_context: 131072
+  qwen2.5-14b:
+    params_b: 14.7
+    active_params_b: 14.7
+    layers: 48
+    attention_heads: 40
+    kv_heads: 8
+    head_dim: 128
+    max_context: 131072
+  qwen2.5-32b:
+    params_b: 32.5
+    active_params_b: 32.5
+    layers: 64
+    attention_heads: 40
+    kv_heads: 8
+    head_dim: 128
+    max_context: 131072
+  qwen3-30b-a3b:
+    params_b: 30.5
+    active_params_b: 3.3
+    layers: 48
+    attention_heads: 32
+    kv_heads: 4
+    head_dim: 128
+    max_context: 131072
+    experts: 128
+    experts_per_token: 8
+  llama-3.1-70b:
+    params_b: 70.6
+    active_params_b: 70.6
+    layers: 80
+    attention_heads: 64
+    kv_heads: 8
+    head_dim: 128
+    max_context: 131072
+  qwen2.5-72b:
+    params_b: 72.7
+    active_params_b: 72.7
+    layers: 80
+    attention_heads: 64
+    kv_heads: 8
+    head_dim: 128
+    max_context: 131072

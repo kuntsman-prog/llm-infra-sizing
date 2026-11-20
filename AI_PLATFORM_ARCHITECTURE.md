@@ -1,163 +1,165 @@
-# Референсная архитектура AI-платформы с нуля
+# Reference architecture of an AI platform built from scratch
 
-Документ отвечает на вопросы, с которых начинается любая AI-платформа: что действительно нужно построить, что пока не нужно, какие технологии взять, каких специалистов нанять, сколько ресурсов потребуется и в каком порядке всё реализовывать. Расчёты ресурсов делаются калькулятором из этого репозитория.
+**English** | [Русский](AI_PLATFORM_ARCHITECTURE.ru.md)
 
-## 0. Принципы
+This document answers the questions every AI platform starts with: what really needs to be built, what is not needed yet, which technologies to use, which specialists to hire, how many resources are required and in what order to implement everything. Resource estimates come from the calculator in this repository.
 
-1. **Сначала измерить нагрузку, потом покупать GPU.** Пилот на облачных GPU или API даёт реальные промпты, длину контекста и пиковый поток. Без них сайзинг точен только до порядка величины.
-2. **Независимость от модели.** Все обращения идут через единый шлюз, поэтому модель меняется конфигурацией, а не переписыванием приложений.
-3. **Безопасность с первого дня.** Права доступа к данным проверяются при каждом поиске и каждом вызове инструмента, а не добавляются после пилота.
-4. **Оценка качества как часть платформы.** Набор эталонных вопросов и метрик прогоняется при каждой смене модели, промпта или индекса.
-5. **Готовое вместо самописного.** Свои у нас данные, права и процессы. Шлюз, движок инференса, векторная база и наблюдаемость берутся готовыми.
+## 0. Principles
 
-## 1. Вопросы до архитектуры
+1. **Measure the load first, buy GPUs later.** A pilot on cloud GPUs or an API produces real prompts, context lengths and peak traffic. Without them, sizing is accurate only to an order of magnitude.
+2. **Model independence.** All calls go through a single gateway, so a model is changed by configuration rather than by rewriting applications.
+3. **Security from day one.** Data access rights are checked on every search and every tool call, not added after the pilot.
+4. **Quality evaluation as part of the platform.** A set of reference questions and metrics runs on every change of model, prompt or index.
+5. **Off the shelf rather than home-made.** Our data, permissions and processes are ours. The gateway, inference engine, vector database and observability are taken off the shelf.
 
-| Вопрос | На какое решение влияет |
+## 1. Questions before the architecture
+
+| Question | Which decision it drives |
 |---|---|
-| Какие задачи решает система, кто пользователи, сколько их | профиль нагрузки, классы моделей |
-| Можно ли передавать данные во внешний API | облако, своё оборудование или гибрид |
-| Какие источники знаний, как часто меняются, какие права доступа | архитектура знаний, синхронизация прав |
-| Какая задержка допустима: диалог, агент или пакетная обработка | TTFT и TPOT, а значит число GPU |
-| Должны ли агенты что-то менять во внешних системах | модель прав агентов, подтверждение человеком |
-| Требования регулятора и аудита | журналирование, хранение, локализация данных |
-| Бюджет и сроки | этапность, облако на старте или закупка |
+| What tasks does the system solve, who are the users, how many | load profile, model classes |
+| May data be sent to an external API | cloud, own hardware or hybrid |
+| Which knowledge sources, how often they change, what access rights apply | knowledge architecture, permission sync |
+| What latency is acceptable: dialogue, agent or batch processing | TTFT and TPOT, and therefore the number of GPUs |
+| Should agents change anything in external systems | agent permission model, human confirmation |
+| Regulatory and audit requirements | logging, retention, data residency |
+| Budget and timeline | phasing, cloud at the start or purchase |
 
-## 2. Контейнеры (C4, уровень 2)
+## 2. Containers (C4, level 2)
 
 ```mermaid
 flowchart TB
-    U[Пользователи и приложения] --> GW[LLM Gateway<br/>аутентификация, квоты,<br/>маршрутизация, учёт стоимости]
-    GW --> AG[Agent Orchestrator<br/>граф шагов, лимиты,<br/>подтверждение человеком]
-    GW --> RAG[Retrieval Service<br/>гибридный поиск,<br/>фильтр прав, реранкер]
-    AG --> TR[Tool Registry, MCP<br/>инструменты с правами]
+    U[Users and applications] --> GW[LLM Gateway<br/>authentication, quotas,<br/>routing, cost accounting]
+    GW --> AG[Agent Orchestrator<br/>step graph, limits,<br/>human confirmation]
+    GW --> RAG[Retrieval Service<br/>hybrid search,<br/>permission filter, reranker]
+    AG --> TR[Tool Registry, MCP<br/>tools with permissions]
     AG --> RAG
-    GW --> SRV[Model Serving, vLLM<br/>малая, средняя, большая модель]
-    RAG --> EMB[Embeddings и Reranker]
-    RAG --> VDB[(Векторная БД)]
-    RAG --> FTS[(Полнотекстовый поиск)]
-    ING[Ingestion<br/>парсинг, OCR, нарезка,<br/>метаданные, права] --> LAKE[(Knowledge Lake<br/>объектное хранилище)]
+    GW --> SRV[Model Serving, vLLM<br/>small, medium, large model]
+    RAG --> EMB[Embeddings and Reranker]
+    RAG --> VDB[(Vector DB)]
+    RAG --> FTS[(Full-text search)]
+    ING[Ingestion<br/>parsing, OCR, chunking,<br/>metadata, permissions] --> LAKE[(Knowledge Lake<br/>object storage)]
     ING --> VDB
     ING --> FTS
-    SRC[Источники: документы,<br/>базы, системы] --> ING
-    GW -.-> OBS[Наблюдаемость<br/>трассировка, метрики,<br/>оценка качества]
-    GW -.-> AUD[(Аудит, SIEM)]
+    SRC[Sources: documents,<br/>databases, systems] --> ING
+    GW -.-> OBS[Observability<br/>tracing, metrics,<br/>quality evaluation]
+    GW -.-> AUD[(Audit, SIEM)]
     IDP[IdP, OIDC] --> GW
-    TR --> EXT[Корпоративные системы]
+    TR --> EXT[Enterprise systems]
 ```
 
-## 3. Стратегия моделей
+## 3. Model strategy
 
-| Класс | Размер | Задачи |
+| Class | Size | Tasks |
 |---|---|---|
-| Малая | 7–14B | классификация, извлечение полей, маршрутизация, переписывание запроса |
-| Средняя | около 30B, в том числе MoE | ответы по документам (RAG), большая часть диалогов |
-| Большая | 70B и больше | планирование агентов, сложные рассуждения, сложные документы |
-| Эмбеддинги и реранкер | до 1B | поиск; многоязычные модели для русского текста |
+| Small | 7–14B | classification, field extraction, routing, query rewriting |
+| Medium | around 30B, including MoE | document answers (RAG), most dialogues |
+| Large | 70B and above | agent planning, complex reasoning, complex documents |
+| Embeddings and reranker | up to 1B | search; multilingual models for non-English text |
 
-- **Open-weight или проприетарные.** Критерии: можно ли передавать данные провайдеру, качество на русском и в предметной области на нашем наборе проверок, стоимость при нашем объёме, контроль версий. Открытые модели дают контроль и работу в контуре, проприетарные API дают качество без инфраструктуры. Решение принимается по результатам оценки, а не заранее.
-- **Маршрутизация.** Сначала правилами по типу задачи, позже классификатором на малой модели. Большая модель включается только там, где средняя не проходит порог качества.
-- **Резервирование.** При недоступности большой модели запрос уходит на среднюю с пометкой в ответе. При сбое внешнего API запрос уходит на локальную модель, если данные это допускают.
-- **Дообучение.** Только если RAG и промпты не дают нужного качества на наборе проверок и есть тысячи размеченных примеров. Начинать с LoRA, затем полное дообучение при доказанной пользе.
+- **Open-weight or proprietary.** Criteria: whether data may be sent to a provider, quality in the target language and domain on our own test set, cost at our volume, version control. Open models give control and on-premise operation, proprietary APIs give quality without infrastructure. The decision follows evaluation, not the other way round.
+- **Routing.** First by rules per task type, later by a classifier on a small model. The large model is used only where the medium one does not reach the quality threshold.
+- **Fallback.** If the large model is unavailable, the request goes to the medium one and the answer is marked. If an external API fails, the request goes to a local model when the data allows it.
+- **Fine-tuning.** Only if RAG and prompts do not reach the required quality on the test set and thousands of labelled examples exist. Start with LoRA, move to full fine-tuning only with proven benefit.
 
-## 4. LLM-платформа
+## 4. LLM platform
 
-- **Шлюз.** Единый OpenAI-совместимый API, ключи и квоты по командам, маршрутизация между моделями и провайдерами, учёт стоимости на запрос, входные и выходные фильтры.
-- **Инференс.** vLLM или аналог: непрерывный батчинг, страничный KV-кэш, кэш префиксов. Кэш префиксов особенно важен для RAG и агентов: общий системный промпт и инструкции не считаются заново.
-- **Масштабирование.** Реплики модели в Kubernetes, автоскейлинг по длине очереди и заполнению KV-кэша, а не по загрузке CPU. Tensor parallel только внутри сервера с NVLink; масштабирование сверх одного сервера через реплики.
-- **Версионирование.** Реестр моделей, канареечный выпуск и теневой режим для новой версии, откат конфигурацией шлюза.
-- **Метрики.** Время до первого токена, время на токен, длина очереди, заполнение KV-кэша, ошибки, стоимость, качество по выборке ответов.
+- **Gateway.** A single OpenAI-compatible API, keys and quotas per team, routing between models and providers, cost accounting per request, input and output guards.
+- **Inference.** vLLM or similar: continuous batching, paged KV cache, prefix caching. Prefix caching matters most for RAG and agents: shared system prompts and instructions are not recomputed.
+- **Scaling.** Model replicas in Kubernetes, autoscaling on queue length and KV cache occupancy rather than CPU load. Tensor parallelism only within a server with NVLink; scaling beyond one server through replicas.
+- **Versioning.** A model registry, canary releases and shadow mode for a new version, rollback by gateway configuration.
+- **Metrics.** Time to first token, time per output token, queue length, KV cache occupancy, errors, cost, quality on a sample of answers.
 
-## 5. Знания и данные
+## 5. Knowledge and data
 
-- **Загрузка.** Парсинг и OCR, нарезка с учётом структуры документа, метаданные, метки конфиденциальности и права из системы-источника.
-- **Хранение.** Knowledge Lake в объектном хранилище как источник истины: индексы можно пересобрать из него.
-- **Поиск.** Гибридный: полнотекстовый и векторный со слиянием рангов, затем реранкер. Фильтр прав передаётся в оба поиска вместе с запросом, а результат проверяется повторно в коде.
-- **Синхронизация прав.** Изменение прав в источнике доходит до индексов быстрее, чем изменение содержимого: устаревшее право опаснее устаревшего текста.
-- **Память.** Краткосрочная: контекст сессии. Долговременная: факты о пользователе и задачах с владельцем, сроком хранения и правом на удаление. Не «память обо всём».
-- **Переиндексация.** Смена модели эмбеддингов означает пересчёт всех векторов: через теневой индекс и переключение.
+- **Ingestion.** Parsing and OCR, structure-aware chunking, metadata, confidentiality labels and permissions from the source system.
+- **Storage.** A Knowledge Lake in object storage as the source of truth: indexes can be rebuilt from it.
+- **Search.** Hybrid: full-text and vector with rank fusion, then a reranker. The permission filter is passed to both searches together with the query, and results are re-checked in code.
+- **Permission sync.** A change of rights in the source reaches the indexes faster than a change of content: a stale permission is more dangerous than stale text.
+- **Memory.** Short-term: session context. Long-term: facts about users and tasks with an owner, a retention period and the right to deletion. Not "memory about everything".
+- **Reindexing.** Changing the embedding model means recomputing every vector: through a shadow index and a switch-over.
 
-## 6. Агенты
+## 6. Agents
 
-- **Оркестрация.** Граф шагов с явными состояниями. Детерминированные шаги делаются кодом, модель решает только там, где нужна гибкость.
-- **Инструменты.** Через MCP или аналог, каждый с описанной моделью прав. Личность пользователя берётся из токена, а не из параметров, которые передаёт агент.
-- **Права.** По умолчанию только чтение. Изменения во внешних системах проходят через подтверждение человеком.
-- **Лимиты.** Число шагов, бюджет токенов и времени на задачу, ограничение частоты вызовов.
-- **Журнал.** Каждый шаг, вызов инструмента и его результат; исполнение кода только в песочнице.
+- **Orchestration.** A step graph with explicit states. Deterministic steps are done in code; the model decides only where flexibility is needed.
+- **Tools.** Through MCP or similar, each with a defined permission model. The user's identity comes from the token, not from parameters the agent passes.
+- **Permissions.** Read-only by default. Changes in external systems require human confirmation.
+- **Limits.** Number of steps, token and time budget per task, call rate limits.
+- **Log.** Every step, tool call and result; code execution only in a sandbox.
 
-## 7. Безопасность и эксплуатация
+## 7. Security and operations
 
-- Аутентификация через OIDC, авторизация по атрибутам (ABAC), секреты в Vault.
-- Сегментация сети: серверы инференса без выхода в интернет, доступ только через шлюз.
-- Защита от инъекций: карантин подозрительных фрагментов при загрузке, входные и выходные фильтры, данные в промпте помечены как данные, а не инструкции.
-- Аудит в SIEM, маскирование персональных данных в журналах.
+- Authentication via OIDC, attribute-based authorization (ABAC), secrets in Vault.
+- Network segmentation: inference servers have no internet access, access only through the gateway.
+- Injection protection: quarantine of suspicious chunks at ingestion, input and output guards, data in the prompt marked as data rather than instructions.
+- Audit to a SIEM, personal data masked in logs.
 
-| Компонент | Как восстановить | RPO | RTO |
+| Component | How to restore | RPO | RTO |
 |---|---|---|---|
-| Веса моделей | загрузить из реестра моделей | не важен | время загрузки, минуты |
-| Векторный и полнотекстовый индексы | снапшоты или пересборка из Knowledge Lake | до последнего снапшота | часы при пересборке |
-| Knowledge Lake | репликация и резервные копии | минуты | часы |
-| Конфигурации, промпты, правила | Git | ноль | минуты |
-| Журналы и аудит | SIEM | минуты | не критично для сервиса |
+| Model weights | load from the model registry | not relevant | load time, minutes |
+| Vector and full-text indexes | snapshots or rebuild from the Knowledge Lake | up to the last snapshot | hours for a rebuild |
+| Knowledge Lake | replication and backups | minutes | hours |
+| Configurations, prompts, rules | Git | zero | minutes |
+| Logs and audit | SIEM | minutes | not critical for the service |
 
-## 8. Инфраструктура: облако, своё или гибрид
+## 8. Infrastructure: cloud, own or hybrid
 
-| Фактор | Склоняет к облаку или API | Склоняет к своему оборудованию |
+| Factor | Points to cloud or API | Points to own hardware |
 |---|---|---|
-| Данные | можно передавать внешнему провайдеру | нельзя выносить из контура |
-| Нагрузка | небольшая, неравномерная, неизвестная | большая и стабильная |
-| GPU | нужны сейчас | можно ждать поставку |
-| Затраты | нет капитального бюджета | выгоднее на горизонте 3 лет |
-| Команда | нет эксплуатации GPU | есть SRE и ЦОД |
+| Data | may be sent to an external provider | must not leave the perimeter |
+| Load | small, uneven, unknown | large and stable |
+| GPUs | needed now | delivery can be awaited |
+| Costs | no capital budget | cheaper over a 3-year horizon |
+| Team | no GPU operations | SRE and data centre in place |
 
-**Рекомендация по умолчанию:** пилот на облачных GPU или API (для неконфиденциальных данных), 2–3 месяца измерений, затем решение о закупке по реальному профилю. Частый итог: гибрид, где конфиденциальные данные обрабатываются на своём оборудовании, а пики и эксперименты уходят в облако. Доступность GPU и сроки поставки нужно проверять отдельно: это самостоятельный риск проекта.
+**Default recommendation:** a pilot on cloud GPUs or an API (for non-confidential data), 2–3 months of measurements, then a purchase decision based on the real profile. A common outcome is hybrid: confidential data is processed on own hardware, peaks and experiments go to the cloud. GPU availability and delivery times must be checked separately: they are a project risk in their own right.
 
-Ориентиры для серверов: 8 GPU на сервер с NVLink для tensor parallel; NVMe для быстрой загрузки весов; сеть 100–400 Гбит/с между серверами нужна только при разнесении одной модели на несколько серверов, поэтому лучше масштабироваться репликами. Сервер с восемью GPU уровня H100 потребляет около 10 кВт, что нужно согласовать с ЦОД по питанию и охлаждению.
+Server guidelines: 8 GPUs per server with NVLink for tensor parallelism; NVMe for fast weight loading; 100–400 Gbit/s networking between servers is needed only when one model is split across several servers, so scaling through replicas is preferable. A server with eight H100-class GPUs draws about 10 kW, which must be agreed with the data centre for power and cooling.
 
-## 9. Экономика
+## 9. Economics
 
-Калькулятор показывает, что выбор зависит от объёма. Корпоративный ассистент на 2 000 сотрудников при ориентировочных ценах: API около $48 тыс. за 3 года, своё оборудование от $142 тыс., облачные GPU от $237 тыс. Агентная платформа с моделью класса 70B: API около $192 тыс., своё оборудование от $724 тыс. Пакетная обработка документов в рабочие часы: облачная аренда дешевле API. Цены ориентировочные; вывод, который сохраняется при любых ценах: при малом объёме дешевле API, а свои GPU окупаются при большой стабильной нагрузке или когда данные нельзя выносить.
+The calculator shows that the choice depends on volume. An enterprise assistant for 2,000 employees at indicative prices: API about $48K over 3 years, own hardware from $142K, cloud GPUs from $237K. An agent platform on a 70B-class model: API about $192K, own hardware from $724K. Batch document processing during working hours: cloud rental is cheaper than an API. Prices are indicative; the conclusion that holds at any prices: at low volume an API is cheaper, while own GPUs pay off under large stable load or when data must not leave the perimeter.
 
-Главные рычаги снижения стоимости:
-- квантизация весов и KV-кэша (FP8, INT4) при контроле качества на наборе проверок;
-- кэш префиксов для общих инструкций и контекста;
-- маршрутизация простых задач на малые модели;
-- MoE-модели, которые при малом батче читают только активных экспертов;
-- пакетные задачи в рабочие часы на арендованных GPU.
+Main cost levers:
+- quantization of weights and KV cache (FP8, INT4) with quality checked on the test set;
+- prefix caching for shared instructions and context;
+- routing simple tasks to small models;
+- MoE models, which read only active experts at small batch sizes;
+- batch jobs during working hours on rented GPUs.
 
-## 10. Этапы
+## 10. Phases
 
-| Этап | Срок | Что строим | Результат |
+| Phase | Duration | What is built | Outcome |
 |---|---|---|---|
-| 0. Требования | 2–4 недели | профиль нагрузки, набор проверок качества, замер на облаке или API | обоснованный сайзинг и выбор моделей |
-| 1. MVP | до 3 месяцев | шлюз, одна модель, RAG с правами, наблюдаемость, оценка качества, базовая безопасность | первые пользователи и метрики |
-| 2. Расширение | 3–6 месяцев | агенты с инструментами только для чтения, второй класс моделей, маршрутизация | решение о своём оборудовании по реальным данным |
-| 3. Масштаб | 6–12 месяцев | отказоустойчивость и DR, оптимизация стоимости, агенты с изменениями через подтверждение, дообучение при доказанной пользе | промышленная эксплуатация |
+| 0. Requirements | 2–4 weeks | load profile, quality test set, measurements in the cloud or on an API | justified sizing and model choice |
+| 1. MVP | up to 3 months | gateway, one model, RAG with permissions, observability, quality evaluation, baseline security | first users and metrics |
+| 2. Expansion | 3–6 months | agents with read-only tools, a second model class, routing | decision on own hardware based on real data |
+| 3. Scale | 6–12 months | high availability and DR, cost optimization, agents making changes with confirmation, fine-tuning if proven useful | production operation |
 
-## 11. Что не строить сразу
+## 11. What not to build yet
 
-- Свой GPU-кластер до измерения реальной нагрузки.
-- Дообучение моделей до появления набора проверок качества.
-- Мультиагентные системы: сначала один агент с хорошими инструментами.
-- Собственные шлюз, векторную базу или оркестратор, если готовые решения закрывают задачу.
-- Универсальную память обо всём: только конкретные факты с владельцем и сроком хранения.
+- An own GPU cluster before the real load is measured.
+- Fine-tuning before a quality test set exists.
+- Multi-agent systems: first one agent with good tools.
+- An own gateway, vector database or orchestrator if off-the-shelf solutions do the job.
+- Universal memory about everything: only specific facts with an owner and a retention period.
 
-## 12. Команда и порядок найма
+## 12. Team and hiring order
 
-1. **Инженер LLM-платформы:** инференс, vLLM, оценка моделей, шлюз.
-2. **Backend и data-инженер:** загрузка знаний, интеграции, поиск.
-3. **MLOps или SRE:** Kubernetes, GPU, наблюдаемость, автоскейлинг.
-4. **Аналитик качества:** наборы проверок, метрики, разбор ошибок вместе с заказчиками.
-5. **Специалист по безопасности ИИ:** на неполную занятость или внешний, с первого этапа.
+1. **LLM platform engineer:** inference, vLLM, model evaluation, gateway.
+2. **Backend and data engineer:** knowledge ingestion, integrations, search.
+3. **MLOps or SRE:** Kubernetes, GPUs, observability, autoscaling.
+4. **Quality analyst:** test sets, metrics, error analysis together with business owners.
+5. **AI security specialist:** part-time or external, from the first phase.
 
-Позже: разработчики агентов, ML-инженеры для дообучения, если оно окажется оправданным.
+Later: agent developers, ML engineers for fine-tuning if it proves justified.
 
-## 13. Риски
+## 13. Risks
 
-| Риск | Мера |
+| Risk | Mitigation |
 |---|---|
-| Доступность GPU и сроки поставки | облако на старте, ранний заказ, несколько поставщиков |
-| Качество открытых моделей на русском и в домене | набор проверок до выбора модели, маршрутизация на большую модель |
-| Зависимость от провайдера API | единый шлюз, локальная модель в резерве |
-| Утечки через поиск и агентов | фильтр прав в поиске, права инструментов, аудит, тесты на утечки |
-| Рост стоимости инференса | учёт стоимости на запрос в шлюзе, кэш префиксов, маршрутизация |
-| Дефицит специалистов | готовые компоненты вместо самописных, документирование решений |
+| GPU availability and delivery times | cloud at the start, early orders, several suppliers |
+| Quality of open models in the target language and domain | test set before choosing a model, routing to the large model |
+| Dependence on an API provider | a single gateway, a local model as fallback |
+| Leaks through search and agents | permission filter in search, tool permissions, audit, leak tests |
+| Growing inference cost | per-request cost accounting in the gateway, prefix caching, routing |
+| Shortage of specialists | off-the-shelf components instead of home-made ones, documented decisions |

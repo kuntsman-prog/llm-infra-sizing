@@ -14,14 +14,14 @@ G, ECON = load_gpus()
 
 
 def test_kv_per_token_matches_known_value():
-    # Llama 3.1 70B: 2 × 80 слоёв × 8 KV-голов × 128 × 2 байта = 327 680 байт (320 КБ)
+    # Llama 3.1 70B: 2 × 80 слоёв × 8 KV heads × 128 (head dim) × 2 байта = 327 680 байт (320 КБ)
     assert kv_bytes_per_token(M["llama-3.1-70b"], "fp16") == 327_680
     # 8 000 токенов на запрос: около 2,6 ГБ
     assert kv_gb_per_sequence(M["llama-3.1-70b"], "fp16", 8000) == pytest.approx(2.62, abs=0.01)
 
 
 def test_gqa_matters():
-    # Без grouped-query attention KV-кэш был бы в 8 раз больше (64 головы вместо 8)
+    # Без grouped-query attention KV-кэш был бы в 8 раз больше (64 attention heads вместо 8 KV heads)
     m = M["llama-3.1-70b"]
     assert kv_bytes_per_token(replace(m, kv_heads=m.attention_heads), "fp16") == 8 * kv_bytes_per_token(m, "fp16")
 
@@ -41,7 +41,7 @@ def test_72b_fp16_needs_more_than_one_h100():
 
 def test_tp_must_divide_heads():
     sc = Scenario(name="t", description="", model="qwen2.5-7b")
-    p = plan_for_tp(sc, M["qwen2.5-7b"], G["h100-sxm"], 8)   # 28 голов на 8 не делятся
+    p = plan_for_tp(sc, M["qwen2.5-7b"], G["h100-sxm"], 8)   # 28 attention heads на 8 не делятся
     assert not p.feasible and "не делится" in p.reasons[0]
 
 

@@ -147,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "models":
         for m in load_models().values():
             moe = f", MoE {m.experts_per_token} из {m.experts} экспертов" if m.is_moe else ""
-            print(f"{m.name:<15} {m.params_b:>5} млрд, слоёв {m.layers}, KV-голов {m.kv_heads}{moe}")
+            print(f"{m.name:<15} {m.params_b:>5} млрд, слоёв {m.layers}, KV heads {m.kv_heads}{moe}")
     elif a.cmd == "gpus":
         gpus, _ = load_gpus()
         for g in gpus.values():

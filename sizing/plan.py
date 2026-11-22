@@ -45,7 +45,7 @@ class Plan:
 def plan_for_tp(sc: Scenario, model: Model, gpu: GPU, tp: int) -> Plan:
     p = Plan(gpu=gpu.name, feasible=False, tp=tp, peak_rps=sc.peak_rps)
     if model.attention_heads % tp:
-        p.reasons.append(f"TP={tp}: число голов внимания {model.attention_heads} не делится на {tp}")
+        p.reasons.append(f"TP={tp}: число attention heads ({model.attention_heads}) не делится на {tp}")
         return p
     ctx_tokens = sc.avg_prompt_tokens + sc.avg_output_tokens
     if ctx_tokens > model.max_context:

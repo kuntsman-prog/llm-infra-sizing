@@ -2,9 +2,9 @@
 
 Веса: число параметров × байт на параметр (зависит от квантизации).
 KV-кэш: для каждого токена в контексте каждый слой хранит ключи и значения
-по всем KV-головам: 2 × слои × KV-головы × размер головы × байт на значение.
-Grouped-query attention (KV-голов меньше, чем голов внимания) сокращает KV-кэш
-в разы, поэтому считать надо по kv_heads, а не по attention_heads.
+по всем KV heads: 2 × слои × KV heads × head dim × байт на значение.
+Grouped-query attention (KV heads меньше, чем attention heads) сокращает KV-кэш
+в разы, поэтому считать надо по KV heads, а не по attention heads.
 """
 from __future__ import annotations
 

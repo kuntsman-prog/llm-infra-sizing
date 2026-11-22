@@ -393,7 +393,7 @@ function prefillS(m, g, q, tp, prompt) {
 
 function planForTp(s, m, g, tp) {
   const p = { feasible: false, tp, reasons: [] };
-  if (m.heads % tp) { p.reasons.push(`TP=${tp}: число голов внимания ${m.heads} не делится на ${tp}`); return p; }
+  if (m.heads % tp) { p.reasons.push(`TP=${tp}: число attention heads (${m.heads}) не делится на ${tp}`); return p; }
   const ctx = s.prompt + s.output;
   if (ctx > m.maxCtx) { p.reasons.push("контекст длиннее максимального для модели"); return p; }
   p.weights = weightsGB(m, s.quant);

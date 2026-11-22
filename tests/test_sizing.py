@@ -125,3 +125,15 @@ def test_calc_rejects_bad_values():
     from sizing.cli import main
     assert main(["calc", "--users", "0"]) == 2
     assert main(["calc", "--peak-share", "1.5"]) == 2
+
+
+def test_prefill_has_weight_read_floor_for_moe_short_prompt():
+    from sizing.perf import prefill_s
+    from sizing.memory import weights_gb, GB
+    models = load_models(); gpus, _ = load_gpus()
+    m, g = models["qwen3-30b-a3b"], gpus["h100-sxm"]
+    short = prefill_s(m, g, "fp16", 1, 200)
+    floor = weights_gb(m, "fp16") * GB / (g.bandwidth_tbs * 1e12 * 0.6)
+    assert short >= floor * 0.999          # короткий промпт: упирается в чтение всех весов
+    long = prefill_s(m, g, "fp16", 1, 12000)
+    assert long > floor                    # длинный: упирается в вычисления по активным параметрам

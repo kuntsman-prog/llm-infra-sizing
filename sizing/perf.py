@@ -51,10 +51,19 @@ def tpot_s(model: Model, gpu: GPU, quant: str, kv_dtype: str, tp: int, batch: in
     return max(t_mem, t_cmp) * _comm(gpu, tp)
 
 
-def prefill_s(model: Model, gpu: GPU, tp: int, prompt_tokens: int) -> float:
-    """Время обработки промпта одного запроса."""
-    flops = 2 * model.active_params_b * 1e9 * prompt_tokens
-    return flops / (tp * gpu.fp16_tflops * 1e12 * COMPUTE_EFFICIENCY) * _comm(gpu, tp)
+def prefill_s(model: Model, gpu: GPU, quant: str, tp: int, prompt_tokens: int) -> float:
+    """Время обработки промпта одного запроса.
+
+    Вычисления: около 2 × активные параметры FLOP на токен. Для MoE это верно и при
+    длинном промпте: разные токены идут через разных экспертов, но каждый токен
+    проходит только через своих, поэтому объём вычислений определяют активные параметры.
+    Нижняя граница: за prefill веса читаются из памяти хотя бы один раз (для MoE
+    на длинном промпте задействованы почти все эксперты); на коротких промптах
+    эта граница становится определяющей.
+    """
+    t_cmp = 2 * model.active_params_b * 1e9 * prompt_tokens / (tp * gpu.fp16_tflops * 1e12 * COMPUTE_EFFICIENCY)
+    t_mem = weights_gb(model, quant) * GB / (tp * gpu.bandwidth_tbs * 1e12 * MEMORY_EFFICIENCY)
+    return max(t_cmp, t_mem) * _comm(gpu, tp)
 
 
 __all__ = ["tpot_s", "prefill_s", "moe_weight_fraction", "BYTES_PER_PARAM", "KV_BYTES"]

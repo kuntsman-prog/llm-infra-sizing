@@ -5,9 +5,15 @@
 Two tools for the first stage of any AI platform, when you need to answer how many GPUs are needed, which ones, and what it will cost:
 
 1. **Sizing calculator.** Given a model, quantization, load profile and target latency, it picks a configuration for different GPUs: tensor parallelism, batch size, number of replicas and servers. It compares the three-year cost of owned hardware, rented cloud GPUs and a provider API.
-2. **Reference architecture of an AI platform built from scratch:** [AI_PLATFORM_ARCHITECTURE.md](AI_PLATFORM_ARCHITECTURE.md) (in Russian). What to build and what not to build yet, model strategy, LLM platform, knowledge and RAG, agents and their permissions, security and DR, cloud vs on-premise, phases, hiring order, risks.
+2. **Reference architecture of an AI platform built from scratch:** [AI_PLATFORM_ARCHITECTURE.md](AI_PLATFORM_ARCHITECTURE.md). What to build and what not to build yet, model strategy, LLM platform, knowledge and RAG, agents and their permissions, security and DR, cloud vs on-premise, phases, hiring order, risks.
 
 Console output and scenario descriptions are in Russian.
+
+## Web version
+
+`docs/index.html` is the same calculator as a single page that runs in the browser: pick a preset scenario or enter your own load, and the GPU table, latency and three-year cost recalculate on every change. GPU prices and engineering assumptions (PUE, maintenance, discount rate, engine efficiency, target utilization) are editable on the page, and the table can be reduced to business columns. The page is in Russian and needs no server.
+
+To publish it on GitHub Pages: Settings → Pages → Build and deployment → Deploy from a branch → `main`, folder `/docs`. A user guide for business stakeholders explaining every field with examples (in Russian): [GUIDE.ru.md](GUIDE.ru.md). The page will be available at `https://kuntsman-prog.github.io/llm-infra-sizing/`. It reproduces the Python calculation exactly for the three bundled scenarios.
 
 ## Quick start
 
@@ -93,6 +99,8 @@ sizing/
 config/models.yaml      model parameters
 config/gpus.yaml        GPU specs and economics
 config/scenarios/       load scenarios
-AI_PLATFORM_ARCHITECTURE.md   reference AI platform architecture (Russian)
-tests/                  automated tests
+docs/index.html         web version of the calculator (GitHub Pages)
+GUIDE.ru.md             calculator user guide (Russian)
+AI_PLATFORM_ARCHITECTURE.md   reference AI platform architecture (English, Russian in .ru.md)
+tests/                  automated tests; test_control.py: a worked example checked step by step; test_web_parity.py: the web version matches Python (needs Node.js, skipped otherwise)
 ```

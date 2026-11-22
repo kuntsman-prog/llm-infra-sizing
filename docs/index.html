@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сайзинг LLM-инфраструктуры</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Инженерный пульт: слева параметры, справа сводка, рекомендация, таблица GPU */
+  --bg: #f3f5f7;
+  --panel: #ffffff;
+  --ink: #17202a;
+  --muted: #5b6875;
+  --line: #d8dee5;
+  --accent: #0b6e8a;
+  --accent-soft: #e2f0f4;
+  --good: #1d7a46;
+  --warn: #a35f00;
+  --bad: #b3261e;
+  --bar-own: #0b6e8a;
+  --bar-cloud: #6b5bb5;
+  --bar-api: #8a6d0b;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1418; --panel: #161d23; --ink: #e4eaef; --muted: #93a1ad; --line: #2a343d;
+    --accent: #4fb3cf; --accent-soft: #15303a; --good: #5cc98a; --warn: #e0a347; --bad: #f08a80;
+    --bar-own: #4fb3cf; --bar-cloud: #a597e8; --bar-api: #d9b84a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1418; --panel: #161d23; --ink: #e4eaef; --muted: #93a1ad; --line: #2a343d;
+  --accent: #4fb3cf; --accent-soft: #15303a; --good: #5cc98a; --warn: #e0a347; --bad: #f08a80;
+  --bar-own: #4fb3cf; --bar-cloud: #a597e8; --bar-api: #d9b84a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+header { padding: 20px 24px 8px; display: grid; gap: 4px; max-width: 1400px; margin: 0 auto; }
+h1 { font-family: var(--font-display); font-size: 28px; line-height: 1.15; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 75ch; }
+main { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; padding: 12px 24px 32px; max-width: 1400px; margin: 0 auto; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px 32px; } header { padding: 16px 16px 4px; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+form.panel { padding: 16px; display: grid; gap: 14px; position: sticky; top: 12px; }
+@media (max-width: 900px) { form.panel { position: static; } }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+legend { font-family: var(--font-display); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); padding: 0 0 4px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+input, select { font: 14px var(--font-mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; width: 100%; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[aria-invalid="true"] { border-color: var(--bad); }
+.check { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; }
+.check input { width: auto; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: 500 13px var(--font-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 5px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+.results { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { padding: 12px 14px; display: grid; gap: 2px; }
+.tile b { font: 500 22px var(--font-mono); font-variant-numeric: tabular-nums; }
+.tile span { font-size: 12px; color: var(--muted); }
+.verdict { padding: 16px 18px; border-left: 4px solid var(--accent); display: grid; gap: 8px; }
+.verdict h2 { margin: 0; font-family: var(--font-display); font-size: 20px; text-wrap: balance; }
+.verdict p { margin: 0; max-width: 85ch; }
+.verdict.none { border-left-color: var(--bad); }
+.bars { display: grid; gap: 8px; padding: 14px 18px; }
+.bars h3, .tablewrap h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: 16px; }
+.bar { display: grid; grid-template-columns: minmax(140px, 220px) 1fr 90px; gap: 10px; align-items: center; font-size: 13px; }
+.bar .track { height: 18px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 3px; }
+.bar .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+@media (max-width: 520px) { .bar { grid-template-columns: 1fr 80px; } .bar .track { grid-column: 1 / -1; grid-row: 2; } }
+.tablewrap { padding: 14px 0 6px; }
+.tablewrap h3 { padding: 0 18px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; padding-left: 18px; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+td { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.name { font-family: var(--font-body); font-weight: 500; }
+tr.best td { background: var(--accent-soft); }
+td.reason { font-family: var(--font-body); color: var(--muted); text-align: left; white-space: normal; min-width: 260px; }
+.pill { display: inline-block; font: 500 11px var(--font-body); padding: 1px 7px; border-radius: 10px; margin-left: 6px; border: 1px solid currentColor; }
+.pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); } .pill.good { color: var(--good); }
+.foot { padding: 4px 18px 10px; display: grid; gap: 2px; }
+details.panel { padding: 0; }
+details summary { cursor: pointer; padding: 12px 18px; font-weight: 600; }
+details .scroll { padding-bottom: 12px; }
+details.panel input { width: 90px; text-align: right; }
+.error { color: var(--bad); font-weight: 500; margin: 0; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.notes { padding: 14px 18px; font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
+.notes p { margin: 0; max-width: 95ch; }
+.notes a { color: var(--accent); }
+.gloss { padding: 14px 18px; display: grid; gap: 12px; }
+.gloss h3 { margin: 0; font-family: var(--font-display); font-size: 16px; }
+.gloss .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px 28px; }
+.gloss h4 { margin: 14px 0 2px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.gloss dl { margin: 0; display: grid; gap: 1px; }
+.gloss dt { font-weight: 600; font-size: 13px; margin-top: 7px; }
+.gloss dd { margin: 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+th[title] { cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+.tablehead { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 18px 6px; }
+.tablehead h3 { padding: 0; margin: 0; }
+.seg { display: inline-flex; }
+.seg button { border-radius: 0; }
+.seg button:first-child { border-radius: 5px 0 0 5px; }
+.seg button:last-child { border-radius: 0 5px 5px 0; border-left: 0; }
+th.biz { color: var(--accent); }
+td.biz { font-weight: 600; }
+body.biz-view .eng { display: none; }
+.pill[title] { cursor: help; }
+details.adv { border-top: 1px solid var(--line); padding-top: 10px; }
+details.adv summary { cursor: pointer; font: 600 13px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.adv-body { display: grid; gap: 8px; margin-top: 10px; }
+@media (prefers-reduced-motion: no-preference) { .bar .fill { transition: width .25s ease; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Сайзинг LLM-инфраструктуры</h1>
+  <p>Сколько GPU нужно под нагрузку, уложится ли задержка в цель и что дешевле на горизонте нескольких лет: своё оборудование, аренда в облаке или API провайдера. Расчёт идёт прямо в браузере при каждом изменении параметров.</p>
+</header>
+<main>
+  <form class="panel" id="form" autocomplete="off">
+    <fieldset>
+      <legend>Готовый сценарий</legend>
+      <div class="presets" id="presets"></div>
+      <p class="hint" id="preset-desc"></p>
+    </fieldset>
+    <fieldset>
+      <legend>Модель</legend>
+      <label for="model">Модель
+        <select id="model"></select>
+      </label>
+      <div class="row">
+        <label for="quant">Веса
+          <select id="quant">
+            <option value="fp16">fp16</option><option value="bf16">bf16</option><option value="fp8">fp8</option><option value="int8">int8</option><option value="int4">int4</option>
+          </select>
+        </label>
+        <label for="kv">KV-кэш
+          <select id="kv"><option value="fp16">fp16</option><option value="bf16">bf16</option><option value="fp8">fp8</option></select>
+        </label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Нагрузка</legend>
+      <div class="row">
+        <label for="users">Пользователей<input id="users" type="number" min="1" step="1"></label>
+        <label for="rpd">Запросов в день на польз.<input id="rpd" type="number" min="0.1" step="any"></label>
+      </div>
+      <div class="row">
+        <label for="calls">Вызовов модели на запрос<input id="calls" type="number" min="1" step="any"></label>
+        <label for="peak">Доля трафика в пиковый час<input id="peak" type="number" min="0.01" max="1" step="0.01"></label>
+      </div>
+      <div class="row">
+        <label for="prompt">Промпт, токенов<input id="prompt" type="number" min="1" step="1"></label>
+        <label for="output">Ответ, токенов<input id="output" type="number" min="1" step="1"></label>
+      </div>
+      <label for="days">Рабочих дней в месяц<input id="days" type="number" min="1" max="31" step="1"></label>
+      <p class="hint"><b>Вызовы:</b> чат 1, RAG 1–2, агент 3–10 (план, вызовы инструментов, проверка). <b>Пиковый час:</b> 0.2 значит, что 20% дневных запросов приходят в самый нагруженный час; для офисного графика типично 0.15–0.25.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Цели по скорости</legend>
+      <div class="row">
+        <label for="ttft">До первого токена, с<input id="ttft" type="number" min="0.05" step="any"></label>
+        <label for="tpot">На токен, мс<input id="tpot" type="number" min="1" step="any"></label>
+      </div>
+      <label class="check" for="ha"><input id="ha" type="checkbox"> Резервная реплика (N+1)</label>
+      <label class="check" for="always"><input id="always" type="checkbox"> Облако круглосуточно, а не только в рабочие часы</label>
+    </fieldset>
+    <fieldset>
+      <legend>Экономика</legend>
+      <div class="row">
+        <label for="years">Горизонт, лет<input id="years" type="number" min="1" max="10" step="1"></label>
+        <label for="kwh">Электричество, $/кВт·ч<input id="kwh" type="number" min="0" step="0.01"></label>
+      </div>
+      <div class="row">
+        <label for="api-in">API, $ за 1М входных<input id="api-in" type="number" min="0" step="0.01"></label>
+        <label for="api-out">API, $ за 1М выходных<input id="api-out" type="number" min="0" step="0.01"></label>
+      </div>
+      <p class="hint">Цены GPU и аренды правятся в таблице под результатами. Что означает каждое поле, описано в пояснениях.</p>
+    </fieldset>
+    <details class="adv">
+      <summary>Инженерные допущения</summary>
+      <div class="adv-body">
+        <div class="row">
+          <label for="pue">PUE дата-центра<input id="pue" type="number" min="1" step="0.05" value="1.5"></label>
+          <label for="overhead">Сервер к TDP GPU, раз<input id="overhead" type="number" min="1" step="0.1" value="1.6"></label>
+        </div>
+        <div class="row">
+          <label for="maint">Обслуживание, % в год<input id="maint" type="number" min="0" step="1" value="10"></label>
+          <label for="disc">Ставка дисконтирования, %<input id="disc" type="number" min="0" max="99" step="1" value="0"></label>
+        </div>
+        <div class="row">
+          <label for="memEff">Эффективность памяти, %<input id="memEff" type="number" min="10" max="100" step="5" value="60"></label>
+          <label for="cmpEff">Эффективность вычислений, %<input id="cmpEff" type="number" min="10" max="100" step="5" value="40"></label>
+        </div>
+        <label for="util">Целевая загрузка реплик в пик, %<input id="util" type="number" min="10" max="100" step="5" value="70"></label>
+        <p class="hint">Значения по умолчанию консервативны: хорошо настроенный движок даёт 70–80% по памяти и 50–60% по вычислениям, что уменьшает число GPU на 20–30%. При ставке дисконтирования 0 затраты номинальные.</p>
+      </div>
+    </details>
+    <p class="error" id="error" role="alert" hidden></p>
+  </form>
+
+  <section class="results" aria-live="polite">
+    <div class="tiles">
+      <div class="panel tile"><span>Пиковый поток</span><b id="t-rps"></b><span>вызовов модели в секунду</span></div>
+      <div class="panel tile"><span>Веса модели</span><b id="t-w"></b><span id="t-w-sub"></span></div>
+      <div class="panel tile"><span>KV-кэш на запрос</span><b id="t-kv"></b><span id="t-kv-sub"></span></div>
+      <div class="panel tile"><span>Вызовов в месяц</span><b id="t-calls"></b><span id="t-tok"></span></div>
+    </div>
+
+    <div class="panel verdict" id="verdict"></div>
+
+    <div class="panel bars" id="bars"></div>
+
+    <div class="panel tablewrap">
+      <div class="tablehead"><h3>Подбор по каждому GPU</h3>
+        <div class="seg" role="group" aria-label="Какие колонки показать"><button type="button" id="view-all" aria-pressed="true">Все колонки</button><button type="button" id="view-biz" aria-pressed="false">Для бизнеса</button></div>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th scope="col">GPU</th><th scope="col" class="eng" title="На сколько GPU делится одна копия модели">TP</th><th scope="col" class="eng" title="Сколько копий модели обслуживают поток, включая резервную">Реплик</th><th scope="col" class="biz" title="TP × реплики: сколько карт купить или арендовать">GPU всего</th><th scope="col" title="По 8 GPU в сервере">Серверов</th><th scope="col" class="eng" title="Сколько запросов реплика обрабатывает одновременно">Батч</th>
+            <th scope="col" class="eng" title="Время до первого токена в пик, с очередью">TTFT, с</th><th scope="col" class="eng" title="Скорость генерации при полном батче">мс/токен</th><th scope="col" class="biz" id="th-own">Своё</th><th scope="col" class="biz" id="th-cloud">Облако</th><th scope="col" title="Полная стоимость своего варианта на миллион токенов">$ / 1М токенов, своё</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot"></div>
+      <div class="actions" style="padding: 4px 18px 8px;">
+        <button type="button" id="copy">Скопировать отчёт</button>
+        <button type="button" id="copy-csv">Скопировать таблицу для Excel</button>
+        <span class="hint" id="copy-status" role="status"></span>
+      </div>
+    </div>
+
+    <div class="panel gloss" id="gloss">
+      <h3>Пояснения к полям и таблице</h3>
+      <div class="cols">
+        <div>
+          <h4>Модель</h4>
+          <dl>
+            <dt>Модель</dt><dd>Открытая модель и число её параметров. MoE (смесь экспертов): на каждый токен работает лишь часть сети, «активные» параметры, поэтому генерация быстрее, но память нужна под все веса.</dd>
+            <dt>Веса</dt><dd>Формат хранения весов. fp16 и bf16: 2 байта на параметр, эталон качества. fp8 и int8: 1 байт, потери качества обычно малы. int4: около 0,5 байта, память в 4 раза меньше, но качество нужно проверить на своих задачах.</dd>
+            <dt>KV-кэш</dt><dd>Рабочая память модели о контексте запроса: для каждого токена каждый слой хранит ключи и значения внимания. fp8 вдвое меньше fp16, значит на GPU помещается больше одновременных запросов.</dd>
+          </dl>
+          <h4>Нагрузка</h4>
+          <dl>
+            <dt>Пользователей и запросов в день</dt><dd>Сколько людей или систем обращаются к сервису и сколько запросов в среднем делает каждый за рабочий день.</dd>
+            <dt>Вызовов модели на запрос</dt><dd>Для простого чата 1. Агент или RAG с переформулировкой вопроса вызывает модель несколько раз на одну задачу пользователя.</dd>
+            <dt>Доля трафика в пиковый час</dt><dd>Какая часть дневных вызовов приходится на самый нагруженный час. 0.2 означает 20%; для рабочего дня типично 0.15–0.25. Число реплик считается по пику, а не по среднему.</dd>
+            <dt>Промпт и ответ, токенов</dt><dd>Средняя длина входа (инструкция, история диалога, найденные фрагменты документов) и ответа. Токен примерно равен 3–4 символам русского текста, точнее зависит от модели.</dd>
+            <dt>Рабочих дней в месяц</dt><dd>Нужно для месячного объёма вызовов, стоимости API и аренды облака только в рабочие часы.</dd>
+          </dl>
+          <h4>Цели и экономика</h4>
+          <dl>
+            <dt>До первого токена, с (TTFT)</dt><dd>Сколько пользователь ждёт, пока ответ начнёт появляться. Для чата обычно 1–2 с, для пакетной обработки можно десятки секунд.</dd>
+            <dt>На токен, мс (TPOT)</dt><dd>Скорость «печати» ответа. 50–60 мс на токен это 17–20 токенов в секунду, быстрее, чем человек читает.</dd>
+            <dt>Резервная реплика (N+1)</dt><dd>Одна копия модели сверх нужного, чтобы отказ сервера или обновление не снижали качество сервиса.</dd>
+            <dt>Облако круглосуточно</dt><dd>Если снять отметку, аренда считается только в рабочие часы: 12 часов в рабочий день. Расчёт предполагает почасовую оплату по требованию (on-demand), когда остановленные машины не оплачиваются. При резервировании на год или три цена часа ниже, но платить нужно и за простой.</dd>
+            <dt>Электричество</dt><dd>Цена киловатт-часа для своего оборудования. Учтены потребление сервера (в 1,6 раза больше TDP GPU) и PUE дата-центра 1,5.</dd>
+            <dt>API, $ за 1М токенов</dt><dd>Цена провайдера за миллион входных и выходных токенов для модели сопоставимого класса. При смене модели вручную цены не меняются: подставьте прайс провайдера для выбранного класса.</dd>
+          </dl>
+          <h4>Инженерные допущения</h4>
+          <dl>
+            <dt>PUE и сервер к TDP</dt><dd>Сколько энергии тратит ЦОД сверх оборудования (1,2–1,3 у современных, 1,6–1,8 у старых) и во сколько раз сервер потребляет больше своих GPU.</dd>
+            <dt>Ставка дисконтирования</dt><dd>Приводит будущие ежемесячные платежи к сегодняшним деньгам. Покупка оборудования оплачивается сразу и не дисконтируется, поэтому ставка выше нуля делает облако и API относительно дешевле. При нуле затраты номинальные; для бюджетного решения на 5 лет задайте ставку, принятую в компании.</dd>
+            <dt>Эффективность памяти и вычислений</dt><dd>Какую долю паспортной пропускной способности памяти (генерация) и вычислительной мощности (обработка промпта) реально достигает движок инференса. По умолчанию 60% и 40%, это консервативно.</dd>
+            <dt>Целевая загрузка реплик</dt><dd>Насколько загружены копии модели в пиковый час. 70% оставляет запас на всплески; при 90% очередь и время до первого токена растут резко.</dd>
+          </dl>
+        </div>
+        <div>
+          <h4>Сводка</h4>
+          <dl>
+            <dt>Пиковый поток</dt><dd>Вызовов модели в секунду в самый нагруженный час: пользователи × запросы × вызовы × доля пика ÷ 3600.</dd>
+            <dt>Веса модели</dt><dd>Сколько памяти GPU занимают сами веса при выбранном формате.</dd>
+            <dt>KV-кэш на запрос</dt><dd>Сколько памяти занимает контекст одного запроса (промпт + ответ). Вместе с весами определяет, сколько запросов помещается на GPU одновременно.</dd>
+          </dl>
+          <h4>Таблица подбора</h4>
+          <dl>
+            <dt>GPU</dt><dd>Модель ускорителя. «Стенд»: потребительская карта, только для пилотов. «Не подходит»: причина, по которой цели недостижимы даже на 8 картах.</dd>
+            <dt>TP (tensor parallel)</dt><dd>На сколько GPU делится одна копия модели. Нужен, когда модель не помещается на одну карту или одной карты не хватает по скорости.</dd>
+            <dt>Реплик</dt><dd>Сколько независимых копий модели обслуживают поток, включая резервную. Пик занимает не больше 70% их мощности.</dd>
+            <dt>GPU всего и серверов</dt><dd>GPU всего = TP × реплики. Серверов: по 8 GPU в сервере.</dd>
+            <dt>Батч</dt><dd>Сколько запросов одна реплика обрабатывает одновременно, не выходя за цель по скорости. «Малый батч»: карта едва справляется и используется неэффективно.</dd>
+            <dt>TTFT, с</dt><dd>Расчётное время до первого токена в пиковый час, включая ожидание в очереди.</dd>
+            <dt>мс/токен</dt><dd>Расчётная скорость генерации при полном батче.</dd>
+            <dt>Своё, N лет</dt><dd>Покупка GPU и серверов, электроэнергия и обслуживание (по умолчанию 10% от стоимости оборудования в год). Без зарплат эксплуатации, лицензий и налогов. При ставке дисконтирования выше нуля будущие платежи приведены к сегодняшним деньгам.</dd>
+            <dt>Облако, N лет</dt><dd>Аренда того же числа GPU у облачного провайдера.</dd>
+            <dt>$ / 1М токенов, своё</dt><dd>Полная стоимость своего варианта, делённая на все токены (вход и выход) за горизонт. Её можно сравнить с ценой API за миллион токенов.</dd>
+          </dl>
+          <h4>Цены GPU</h4>
+          <dl>
+            <dt>Сервер на GPU</dt><dd>Доля сервера (процессоры, память, диски, сеть) в пересчёте на одну карту.</dd>
+            <dt>Облако, $/ч</dt><dd>Аренда одной карты в час. Все цены ориентировочные: подставьте коммерческие предложения.</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <details class="panel">
+      <summary>Цены и характеристики GPU</summary>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">GPU</th><th scope="col">Память, ГБ</th><th scope="col">ТБ/с</th><th scope="col">TFLOPS fp16</th><th scope="col">Связь</th><th scope="col">Цена GPU, $</th><th scope="col">Сервер на GPU, $</th><th scope="col">Облако, $/ч</th></tr></thead>
+          <tbody id="gpu-rows"></tbody>
+        </table>
+      </div>
+      <p class="hint" style="padding: 0 18px 12px;">Цены ориентировочные и зависят от рынка и поставщика. Перед решением подставьте коммерческие предложения.</p>
+    </details>
+
+    <div class="panel notes">
+      <p><b>Как считается.</b> Генерация ограничена пропускной способностью памяти: на каждом шаге GPU читает веса и KV-кэш всех запросов батча. Обработка промпта ограничена вычислениями, около 2 × активные параметры FLOP на токен. Батч подбирается максимальным, при котором время на токен укладывается в цель и KV-кэш помещается в память. Реплик столько, чтобы пиковый поток занимал не больше целевой загрузки (по умолчанию 70%) их мощности, плюс резервная при N+1.</p>
+      <p><b>Упрощения модели.</b> Время до первого токена считается по обработке промпта одного запроса с учётом очереди; чередование обработки промптов и генерации в движке (chunked prefill) не моделируется. Загрузка реплики обработкой промптов берётся по верхней границе (целевая загрузка от предельной мощности), а реальный поток на реплику после округления и резерва меньше, поэтому время до первого токена оценено с запасом. Для MoE-моделей каждый токен проходит только через своих экспертов, поэтому объём вычислений считается по активным параметрам; при этом обработка промпта не может быть быстрее, чем один раз прочитать все веса из памяти, и эта граница учтена. Потери эффективности MoE-ядер покрываются консервативной эффективностью вычислений.</p>
+      <p><b>Точность ±30–50%.</b> Это оценка порядка величины для выбора варианта и бюджета. Перед закупкой нужен нагрузочный тест на vLLM с реальными промптами. Своё оборудование не включает зарплаты эксплуатации, лицензии, налоги и хранилище (веса моделей, журналы, документы для RAG), а облако не включает хранение данных и сетевой трафик. RTX 4090 подходит только для стендов: лицензия драйвера GeForce не разрешает размещение в ЦОД.</p>
+      <p>Подробное руководство с примерами: <a href="https://github.com/kuntsman-prog/llm-infra-sizing/blob/main/GUIDE.ru.md">GUIDE.ru.md</a>. Исходный код и версия для командной строки: <a href="https://github.com/kuntsman-prog/llm-infra-sizing">github.com/kuntsman-prog/llm-infra-sizing</a>.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+// ENGINE START
+const MODELS = {
+  "qwen2.5-7b":    { params: 7.6,  active: 7.6,  layers: 28, heads: 28, kvHeads: 4, headDim: 128, maxCtx: 131072 },
+  "llama-3.1-8b":  { params: 8.0,  active: 8.0,  layers: 32, heads: 32, kvHeads: 8, headDim: 128, maxCtx: 131072 },
+  "qwen2.5-14b":   { params: 14.7, active: 14.7, layers: 48, heads: 40, kvHeads: 8, headDim: 128, maxCtx: 131072 },
+  "qwen2.5-32b":   { params: 32.5, active: 32.5, layers: 64, heads: 40, kvHeads: 8, headDim: 128, maxCtx: 131072 },
+  "qwen3-30b-a3b": { params: 30.5, active: 3.3,  layers: 48, heads: 32, kvHeads: 4, headDim: 128, maxCtx: 131072, experts: 128, expertsPerToken: 8 },
+  "llama-3.1-70b": { params: 70.6, active: 70.6, layers: 80, heads: 64, kvHeads: 8, headDim: 128, maxCtx: 131072 },
+  "qwen2.5-72b":   { params: 72.7, active: 72.7, layers: 80, heads: 64, kvHeads: 8, headDim: 128, maxCtx: 131072 },
+};
+const GPUS = {
+  "rtx-4090":  { vram: 24,  bw: 1.0,   tflops: 165, tdp: 450, price: 2000,  platform: 1500, cloud: 0.5, link: "pcie",   production: false },
+  "l4":        { vram: 24,  bw: 0.3,   tflops: 121, tdp: 72,  price: 3000,  platform: 1500, cloud: 0.6, link: "pcie",   production: true },
+  "l40s":      { vram: 48,  bw: 0.864, tflops: 362, tdp: 350, price: 9000,  platform: 3000, cloud: 1.2, link: "pcie",   production: true },
+  "a100-80gb": { vram: 80,  bw: 2.0,   tflops: 312, tdp: 400, price: 15000, platform: 6000, cloud: 1.8, link: "nvlink", production: true },
+  "h100-sxm":  { vram: 80,  bw: 3.35,  tflops: 989, tdp: 700, price: 30000, platform: 8000, cloud: 3.0, link: "nvlink", production: true },
+  "h200":      { vram: 141, bw: 4.8,   tflops: 989, tdp: 700, price: 35000, platform: 8000, cloud: 4.0, link: "nvlink", production: true },
+};
+const ECON = { years: 3, kwh: 0.10, pue: 1.5, serverOverhead: 1.6, maintenance: 0.10, apiIn: 0.50, apiOut: 1.50, discount: 0 };
+const BYTES_PER_PARAM = { fp16: 2, bf16: 2, fp8: 1, int8: 1, int4: 0.5 };
+const QUANT_OVERHEAD = { int4: 1.05 };
+const KV_BYTES = { fp16: 2, bf16: 2, fp8: 1 };
+const GB = 1e9, VRAM_UTIL = 0.90, RUNTIME_RESERVE_GB = 1.5;
+// Инженерные допущения: доля паспортной пропускной способности памяти и вычислений, которую достигает движок, и целевая загрузка реплик в пик
+const ASSUME = { memEff: 0.6, cmpEff: 0.4, util: 0.7 };
+const TP_COMM = { nvlink: 0.04, pcie: 0.12 };
+const TP_OPTIONS = [1, 2, 4, 8], GPUS_PER_NODE = 8, HOURS_PER_YEAR = 24 * 365;
+
+const peakRps = s => s.users * s.rpd * s.calls * s.peak / 3600;
+const monthlyCalls = s => s.users * s.rpd * s.calls * s.days;
+const weightsGB = (m, q) => m.params * BYTES_PER_PARAM[q] * (QUANT_OVERHEAD[q] || 1);
+const kvBytesPerToken = (m, kv) => 2 * m.layers * m.kvHeads * m.headDim * KV_BYTES[kv];
+const kvGBPerSeq = (m, kv, tokens) => kvBytesPerToken(m, kv) * tokens / GB;
+const kvCapacityGB = (m, q, vram, tp) => tp * (vram * VRAM_UTIL - RUNTIME_RESERVE_GB) - weightsGB(m, q);
+
+function moeFraction(m, batch) {
+  if (!m.experts) return 1;
+  const active = m.active / m.params;
+  const coverage = 1 - Math.pow(1 - m.expertsPerToken / m.experts, batch);
+  return active + (1 - active) * coverage;
+}
+const comm = (g, tp) => 1 + TP_COMM[g.link] * (tp - 1);
+function tpotS(m, g, q, kv, tp, batch, avgCtx) {
+  const bytes = weightsGB(m, q) * GB * moeFraction(m, batch) + batch * avgCtx * kvBytesPerToken(m, kv);
+  const tMem = bytes / (tp * g.bw * 1e12 * ASSUME.memEff);
+  const tCmp = 2 * m.active * 1e9 * batch / (tp * g.tflops * 1e12 * ASSUME.cmpEff);
+  return Math.max(tMem, tCmp) * comm(g, tp);
+}
+// Prefill: вычисления по активным параметрам (каждый токен идёт только через своих экспертов),
+// но не быстрее, чем один раз прочитать все веса из памяти
+function prefillS(m, g, q, tp, prompt) {
+  const tCmp = 2 * m.active * 1e9 * prompt / (tp * g.tflops * 1e12 * ASSUME.cmpEff);
+  const tMem = weightsGB(m, q) * GB / (tp * g.bw * 1e12 * ASSUME.memEff);
+  return Math.max(tCmp, tMem) * comm(g, tp);
+}
+
+function planForTp(s, m, g, tp) {
+  const p = { feasible: false, tp, reasons: [] };
+  if (m.heads % tp) { p.reasons.push(`TP=${tp}: число голов внимания ${m.heads} не делится на ${tp}`); return p; }
+  const ctx = s.prompt + s.output;
+  if (ctx > m.maxCtx) { p.reasons.push("контекст длиннее максимального для модели"); return p; }
+  p.weights = weightsGB(m, s.quant);
+  p.kvPerSeq = kvGBPerSeq(m, s.kv, ctx);
+  p.kvCap = kvCapacityGB(m, s.quant, g.vram, tp);
+  const maxBatchMem = p.kvCap > 0 ? Math.floor(p.kvCap / p.kvPerSeq) : 0;
+  if (maxBatchMem < 1) { p.reasons.push(`TP=${tp}: веса ${p.weights.toFixed(0)} ГБ не оставляют места под KV-кэш`); return p; }
+  const avgCtx = s.prompt + s.output / 2;
+  const target = s.tpot / 1000;
+  if (tpotS(m, g, s.quant, s.kv, tp, 1, avgCtx) > target) { p.reasons.push(`TP=${tp}: даже один запрос генерирует медленнее ${s.tpot.toFixed(0)} мс на токен`); return p; }
+  let lo = 1, hi = maxBatchMem;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    if (tpotS(m, g, s.quant, s.kv, tp, mid, avgCtx) <= target) lo = mid; else hi = mid - 1;
+  }
+  const b = lo;
+  const tpot = tpotS(m, g, s.quant, s.kv, tp, b, avgCtx);
+  const pre = prefillS(m, g, s.quant, tp, s.prompt);
+  const mu = b / (s.output * tpot + b * pre);
+  // mu: предельная пропускная способность реплики; в пик она загружена не больше чем на ASSUME.util
+  const rho = Math.min(mu * ASSUME.util * pre, 0.95);
+  const ttft = pre * (1 + rho / (1 - rho));
+  if (ttft > s.ttft) { p.reasons.push(`TP=${tp}: время до первого токена ${ttft.toFixed(1)} с больше целевого ${s.ttft} с`); return p; }
+  let replicas = Math.max(1, Math.ceil(peakRps(s) / (mu * ASSUME.util)));
+  if (s.ha) replicas += 1;
+  Object.assign(p, { feasible: true, batch: b, replicas, totalGpus: replicas * tp, ttft, tpotMs: tpot * 1000, replicaRps: mu });
+  p.nodes = Math.ceil(p.totalGpus / GPUS_PER_NODE);
+  return p;
+}
+function bestPlan(s, m, g) {
+  const plans = TP_OPTIONS.map(tp => planForTp(s, m, g, tp));
+  const ok = plans.filter(p => p.feasible);
+  if (!ok.length) return { feasible: false, reasons: plans.flatMap(p => p.reasons) };
+  return ok.reduce((a, c) => (c.totalGpus < a.totalGpus || (c.totalGpus === a.totalGpus && c.tp < a.tp)) ? c : a);
+}
+function estimate(s, g, p, e) {
+  const months = 12 * e.years;
+  // Дисконтирование: ежемесячные платежи приводятся к сегодняшнему дню; покупка оборудования платится сразу
+  const dm = Math.pow(1 + (e.discount || 0), 1 / 12) - 1;
+  const pv = dm > 0 ? (1 - Math.pow(1 + dm, -months)) / dm / months : 1;
+  const capex = p.totalGpus * (g.price + g.platform);
+  const powerKw = p.totalGpus * g.tdp / 1000 * e.serverOverhead * e.pue;
+  const energy = powerKw * HOURS_PER_YEAR * e.years * e.kwh;
+  const maint = capex * e.maintenance * e.years;
+  const hours = s.always ? HOURS_PER_YEAR / 12 : s.days * 12;
+  const cloud = p.totalGpus * g.cloud * hours * months;
+  const calls = monthlyCalls(s) * months;
+  const api = calls * (s.prompt * e.apiIn + s.output * e.apiOut) / 1e6;
+  const tokensM = calls * (s.prompt + s.output) / 1e6;
+  return { capex, own: capex + (energy + maint) * pv, cloud: cloud * pv, api: api * pv, tokensM };
+}
+function validate(s) {
+  const positive = { users: "число пользователей", rpd: "запросов на пользователя в день", calls: "вызовов модели на запрос",
+    prompt: "длина промпта", output: "длина ответа", ttft: "время до первого токена", tpot: "время на токен", days: "число рабочих дней", years: "горизонт расчёта" };
+  for (const [k, label] of Object.entries(positive)) {
+    if (!(s[k] > 0)) return { field: k, msg: `Значение «${label}» должно быть больше нуля.` };
+  }
+  if (!(s.peak > 0 && s.peak <= 1)) return { field: "peak", msg: "Доля трафика в пиковый час должна быть от 0 до 1, например 0.2." };
+  if (s.days > 31) return { field: "days", msg: "Рабочих дней в месяце не может быть больше 31." };
+  if (!(s.pue >= 1)) return { field: "pue", msg: "PUE не может быть меньше 1: это отношение всей энергии ЦОД к энергии оборудования." };
+  if (!(s.overhead >= 1)) return { field: "overhead", msg: "Потребление сервера не может быть меньше потребления его GPU: коэффициент от 1." };
+  for (const [k, label] of [["memEff", "эффективность памяти"], ["cmpEff", "эффективность вычислений"], ["util", "целевая загрузка"]])
+    if (!(s[k] >= 10 && s[k] <= 100)) return { field: k, msg: `Значение «${label}» задаётся в процентах от 10 до 100.` };
+  if (!(s.maint >= 0)) return { field: "maint", msg: "Обслуживание не может быть отрицательным." };
+  if (!(s.disc >= 0 && s.disc < 100)) return { field: "disc", msg: "Ставка дисконтирования задаётся в процентах от 0 до 99." };
+  return null;
+}
+function compute(s, models, gpus, econ) {
+  const m = models[s.model];
+  const rows = Object.entries(gpus).map(([name, g]) => {
+    const p = bestPlan(s, m, g);
+    return { name, g, p, c: p.feasible ? estimate(s, g, p, econ) : null };
+  });
+  const prod = rows.filter(r => r.p.feasible && r.g.production);
+  const apiTotal = estimate(s, { price: 0, platform: 0, tdp: 0, cloud: 0 }, { totalGpus: 0 }, econ).api;
+  const bestOwn = prod.length ? prod.reduce((a, r) => r.c.own < a.c.own ? r : a) : null;
+  const bestCloud = prod.length ? prod.reduce((a, r) => r.c.cloud < a.c.cloud ? r : a) : null;
+  return { m, rows, bestOwn, bestCloud, apiTotal };
+}
+// ENGINE END
+
+const PRESETS = {
+  assistant: { label: "Ассистент с RAG", desc: "Ассистент по внутренним документам для 2 000 сотрудников. <b>Почему так:</b> 1 вызов, потому что ассистент сразу отвечает на вопрос; промпт 3 000 токенов, потому что в него входят найденные фрагменты документов; цели 2 с и 60 мс, чтобы ответ начинался быстро и печатался быстрее чтения; резерв нужен, потому что сотрудники ждут ответа.",
+    model: "qwen2.5-32b", quant: "int4", kv: "fp16", users: 2000, rpd: 15, calls: 1, peak: 0.2, prompt: 3000, output: 350, ttft: 2, tpot: 60, ha: true, always: true, apiIn: 0.5, apiOut: 1.5 },
+  agents: { label: "Агентная платформа", desc: "300 пользователей ставят агентам задачи. <b>Почему так:</b> 6 вызовов на задачу, потому что агент строит план, несколько раз вызывает инструменты, разбирает их результаты и проверяет итог; промпт 12 000 токенов, потому что в нём история шагов и ответы инструментов; модель 72 млрд, потому что агенту нужны устойчивые рассуждения; веса fp8 экономят память при малой потере качества.",
+    model: "qwen2.5-72b", quant: "fp8", kv: "fp8", users: 300, rpd: 10, calls: 6, peak: 0.2, prompt: 12000, output: 500, ttft: 5, tpot: 50, ha: true, always: true, apiIn: 1.0, apiOut: 3.0 },
+  documents: { label: "Пакетная проверка документов", desc: "5 000 документов в день. <b>Почему так:</b> 8 вызовов на документ: разбор разделов и проверки по каждому; цели 30 с и 200 мс, потому что результат никто не ждёт в моменте; MoE-модель генерирует быстро и дёшево; облако только в рабочие часы и без резерва: при сбое пакет дообрабатывается позже.",
+    model: "qwen3-30b-a3b", quant: "fp16", kv: "fp16", users: 5000, rpd: 1, calls: 8, peak: 0.15, prompt: 6000, output: 400, ttft: 30, tpot: 200, ha: false, always: false, apiIn: 0.5, apiOut: 1.5 },
+};
+const $ = id => document.getElementById(id);
+const NUM_FIELDS = { users: "users", rpd: "rpd", calls: "calls", peak: "peak", prompt: "prompt", output: "output", ttft: "ttft", tpot: "tpot", days: "days", years: "years", kwh: "kwh", "api-in": "apiIn", "api-out": "apiOut",
+  pue: "pue", overhead: "overhead", maint: "maint", disc: "disc", memEff: "memEff", cmpEff: "cmpEff", util: "util" };
+const gpus = JSON.parse(JSON.stringify(GPUS));
+let activePreset = "assistant";
+
+const fmtMoney = x => x >= 1e6 ? `$${(x / 1e6).toFixed(2)}M` : `$${Math.round(x / 1e3)}K`;
+const fmtInt = x => Math.round(x).toLocaleString("ru-RU");
+const plural = (n, one, few, many) => { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many; };
+const yearsWord = n => `${n} ${plural(n, "год", "года", "лет")}`;
+
+function fillForm(p) {
+  $("model").value = p.model; $("quant").value = p.quant; $("kv").value = p.kv;
+  for (const [id, key] of Object.entries(NUM_FIELDS)) if (key in p) $(id).value = p[key];
+  $("ha").checked = p.ha; $("always").checked = p.always;
+}
+function readForm() {
+  const s = { model: $("model").value, quant: $("quant").value, kv: $("kv").value, ha: $("ha").checked, always: $("always").checked };
+  for (const [id, key] of Object.entries(NUM_FIELDS)) s[key] = parseFloat($(id).value);
+  return s;
+}
+function renderPresets() {
+  $("presets").innerHTML = "";
+  for (const [key, p] of Object.entries(PRESETS)) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = p.label; b.setAttribute("aria-pressed", key === activePreset);
+    b.addEventListener("click", () => { activePreset = key; fillForm({ ...p, days: 22, years: ECON.years, kwh: ECON.kwh }); renderPresets(); update(); });
+    $("presets").appendChild(b);
+  }
+  $("preset-desc").innerHTML = activePreset ? PRESETS[activePreset].desc : "Свои параметры. Выберите сценарий выше, чтобы вернуться к примеру.";
+}
+function renderGpuTable() {
+  $("gpu-rows").innerHTML = "";
+  for (const [name, g] of Object.entries(gpus)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="name">${name}${g.production ? "" : '<span class="pill warn">стенд</span>'}</td><td>${g.vram}</td><td>${g.bw}</td><td>${g.tflops}</td><td>${g.link === "nvlink" ? "NVLink" : "PCIe"}</td>`;
+    for (const key of ["price", "platform", "cloud"]) {
+      const td = document.createElement("td"), inp = document.createElement("input");
+      inp.type = "number"; inp.min = "0"; inp.step = key === "cloud" ? "0.1" : "100"; inp.value = g[key];
+      inp.id = `gpu-${name}-${key}`; inp.setAttribute("aria-label", `${name}: ${key === "price" ? "цена GPU" : key === "platform" ? "сервер на GPU" : "облако в час"}`);
+      inp.addEventListener("input", () => { const v = parseFloat(inp.value); if (v >= 0) { g[key] = v; update(); } });
+      td.appendChild(inp); tr.appendChild(td);
+    }
+    $("gpu-rows").appendChild(tr);
+  }
+}
+
+let lastReport = "", lastCsv = "", bizView = false;
+function update() {
+  const s = readForm();
+  document.querySelectorAll("#form input").forEach(i => i.removeAttribute("aria-invalid"));
+  const err = validate(s);
+  if (err) {
+    $("error").textContent = err.msg; $("error").hidden = false;
+    const id = Object.keys(NUM_FIELDS).find(k => NUM_FIELDS[k] === err.field); if (id) $(id).setAttribute("aria-invalid", "true");
+    return;
+  }
+  $("error").hidden = true;
+  const econ = { ...ECON, years: s.years, kwh: s.kwh, apiIn: s.apiIn, apiOut: s.apiOut, pue: s.pue, serverOverhead: s.overhead, maintenance: s.maint / 100, discount: s.disc / 100 };
+  Object.assign(ASSUME, { memEff: s.memEff / 100, cmpEff: s.cmpEff / 100, util: s.util / 100 });
+  const r = compute(s, MODELS, gpus, econ);
+  const ctx = s.prompt + s.output;
+
+  $("t-rps").textContent = peakRps(s).toFixed(2);
+  $("t-w").textContent = `${weightsGB(r.m, s.quant).toFixed(1)} ГБ`;
+  $("t-w-sub").textContent = `${r.m.params} млрд параметров${r.m.experts ? `, активных ${r.m.active}` : ""}, ${s.quant}`;
+  $("t-kv").textContent = `${kvGBPerSeq(r.m, s.kv, ctx).toFixed(2)} ГБ`;
+  $("t-kv-sub").textContent = `${Math.round(kvBytesPerToken(r.m, s.kv) / 1024)} КБ на токен × ${fmtInt(ctx)} токенов`;
+  $("t-calls").textContent = fmtInt(monthlyCalls(s));
+  $("t-tok").textContent = `${fmtInt(monthlyCalls(s) * ctx / 1e6)} млн токенов в месяц`;
+  const Y = yearsWord(s.years);
+  $("th-own").textContent = `Своё, ${Y}`; $("th-cloud").textContent = `Облако, ${Y}`;
+
+  const v = $("verdict");
+  let report = [`Модель ${s.model}, веса ${s.quant}, KV-кэш ${s.kv}; пиковый поток ${peakRps(s).toFixed(2)} вызовов/с; цели: TTFT до ${s.ttft} с, до ${s.tpot} мс на токен; N+1: ${s.ha ? "да" : "нет"}.`];
+  if (!r.bestOwn) {
+    v.className = "panel verdict none";
+    v.innerHTML = `<h2>Ни один GPU для ЦОД не укладывается в цели</h2><p>Смягчите цели по скорости, выберите модель меньше или более сильную квантизацию. API провайдера за ${Y}: <b>${fmtMoney(r.apiTotal)}</b>.</p>`;
+    report.push("Ни один GPU для ЦОД не укладывается в цели.");
+  } else {
+    const o = r.bestOwn, c = r.bestCloud;
+    const options = [["своё оборудование", o.c.own], ["аренда в облаке", c.c.cloud], ["API провайдера", r.apiTotal]].sort((a, b) => a[1] - b[1]);
+    v.className = "panel verdict";
+    v.innerHTML = `<h2>Дешевле всего на ${Y}: ${options[0][0]}</h2>
+      <p>Своё оборудование: <b>${o.name}</b>, ${o.p.totalGpus} GPU: ${o.p.replicas} ${plural(o.p.replicas, "копия", "копии", "копий")} модели${s.ha ? " с учётом резервной" : ""}, каждая на ${o.p.tp} GPU, ${o.p.nodes} ${plural(o.p.nodes, "сервер", "сервера", "серверов")}, <b>${fmtMoney(o.c.own)}</b>, из них оборудование ${fmtMoney(o.c.capex)}. Аренда в облаке: от <b>${fmtMoney(c.c.cloud)}</b> на ${c.name}. API провайдера: <b>${fmtMoney(r.apiTotal)}</b>.</p>
+      <p>API подходит, только если данные можно передавать провайдеру. Если данные должны остаться в своём контуре, выбор между своим оборудованием и облаком.</p>`;
+    report.push(`Своё: ${o.name}, ${o.p.totalGpus} GPU (${o.p.replicas} × TP${o.p.tp}), ${fmtMoney(o.c.own)} за ${Y}. Облако: от ${fmtMoney(c.c.cloud)} (${c.name}). API: ${fmtMoney(r.apiTotal)}. Дешевле всего: ${options[0][0]}.`);
+  }
+
+  const bars = [];
+  if (r.bestOwn) bars.push([`Своё: ${r.bestOwn.name}`, r.bestOwn.c.own, "var(--bar-own)"]);
+  if (r.bestCloud) bars.push([`Облако: ${r.bestCloud.name}`, r.bestCloud.c.cloud, "var(--bar-cloud)"]);
+  bars.push(["API провайдера", r.apiTotal, "var(--bar-api)"]);
+  const max = Math.max(...bars.map(b => b[1]));
+  $("bars").innerHTML = `<h3>Стоимость за ${Y}: лучший вариант каждого типа</h3>` + bars.map(([label, val, color]) =>
+    `<div class="bar"><span>${label}</span><div class="track"><div class="fill" style="width:${(val / max * 100).toFixed(1)}%;background:${color}"></div></div><span class="val">${fmtMoney(val)}</span></div>`).join("");
+
+  let anyStand = false, anySmall = false;
+  $("rows").innerHTML = r.rows.map(({ name, g, p, c }) => {
+    if (!p.feasible) return `<tr><td class="name">${name}<span class="pill bad" title="Цели по скорости недостижимы даже при делении модели на 8 карт">не подходит</span></td><td class="reason" colspan="${bizView ? 5 : 10}">${p.reasons[p.reasons.length - 1] || ""}</td></tr>`;
+    const tags = [];
+    if (!g.production) { tags.push('<span class="pill warn" title="Потребительская карта: лицензия драйвера не разрешает размещение в ЦОД. Показана для сравнения, в рекомендации не участвует">стенд</span>'); anyStand = true; }
+    if (p.batch < 4) { tags.push('<span class="pill warn" title="Карта едва укладывается в цель по скорости и одновременно обрабатывает меньше 4 запросов, поэтому каждый запрос обходится дорого">малый батч</span>'); anySmall = true; }
+    if (r.bestOwn && name === r.bestOwn.name) tags.push('<span class="pill good" title="Самый дешёвый вариант своего оборудования среди карт для ЦОД">дешевле своё</span>');
+    const best = r.bestOwn && name === r.bestOwn.name ? ' class="best"' : "";
+    report.push(`${name}: TP${p.tp} × ${p.replicas}, ${p.totalGpus} GPU, батч ${p.batch}, TTFT ${p.ttft.toFixed(2)} с, ${p.tpotMs.toFixed(0)} мс/токен, своё ${fmtMoney(c.own)}, облако ${fmtMoney(c.cloud)}${g.production ? "" : " (стенд)"}`);
+    return `<tr${best}><td class="name">${name}${tags.join("")}</td><td class="eng">${p.tp}</td><td class="eng">${p.replicas}</td><td class="biz">${p.totalGpus}</td><td>${p.nodes}</td><td class="eng">${p.batch}</td><td class="eng">${p.ttft.toFixed(2)}</td><td class="eng">${p.tpotMs.toFixed(0)}</td><td class="biz">${fmtMoney(c.own)}</td><td class="biz">${fmtMoney(c.cloud)}</td><td>${(c.own / c.tokensM).toFixed(3)}</td></tr>`;
+  }).join("");
+  $("foot").innerHTML = [
+    anyStand ? '<p class="hint">«Стенд»: только для стендов и пилотов, в рекомендации не участвует.</p>' : "",
+    anySmall ? '<p class="hint">«Малый батч»: GPU едва укладывается в цель по скорости и используется неэффективно.</p>' : "",
+  ].join("");
+  report.push("Оценка ±30–50%; перед закупкой нужен нагрузочный тест на vLLM.");
+  const num = x => String(Math.round(x)), dec = (x, n) => x.toFixed(n).replace(".", ",");
+  lastCsv = [["GPU", "Статус", "TP", "Копий модели", "GPU всего", "Серверов", "Батч", "TTFT, с", "мс/токен", `Своё за ${Y}, $`, `Облако за ${Y}, $`, `API за ${Y}, $`, "$ за 1М токенов, своё"].join("\t"),
+    ...r.rows.map(({ name, g, p, c }) => p.feasible
+      ? [name, g.production ? "ЦОД" : "стенд", p.tp, p.replicas, p.totalGpus, p.nodes, p.batch, dec(p.ttft, 2), num(p.tpotMs), num(c.own), num(c.cloud), num(r.apiTotal), dec(c.own / c.tokensM, 3)].join("\t")
+      : [name, "не подходит: " + (p.reasons[p.reasons.length - 1] || "")].join("\t"))].join("\n");
+  lastReport = report.join("\n");
+}
+
+for (const name of Object.keys(MODELS)) {
+  const o = document.createElement("option"); o.value = name;
+  const m = MODELS[name]; o.textContent = `${name} (${m.params} млрд${m.experts ? `, MoE, активных ${m.active}` : ""})`;
+  $("model").appendChild(o);
+}
+fillForm({ ...PRESETS.assistant, days: 22, years: ECON.years, kwh: ECON.kwh });
+renderPresets();
+renderGpuTable();
+$("form").addEventListener("input", e => {
+  if (e.target.closest("#presets")) return;
+  if (activePreset) { activePreset = null; renderPresets(); }
+  update();
+});
+$("form").addEventListener("submit", e => e.preventDefault());
+function setView(biz) {
+  bizView = biz;
+  document.body.classList.toggle("biz-view", biz);
+  $("view-all").setAttribute("aria-pressed", !biz); $("view-biz").setAttribute("aria-pressed", biz);
+  update();
+}
+$("view-all").addEventListener("click", () => setView(false));
+$("view-biz").addEventListener("click", () => setView(true));
+$("copy-csv").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(lastCsv); $("copy-status").textContent = "Таблица скопирована: вставьте её в Excel или Google Таблицы."; }
+  catch { $("copy-status").textContent = "Браузер не дал доступ к буферу обмена."; }
+});
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(lastReport); $("copy-status").textContent = "Отчёт скопирован."; }
+  catch { $("copy-status").textContent = "Браузер не дал доступ к буферу обмена."; }
+});
+update();
+</script>
+</body>
+</html>

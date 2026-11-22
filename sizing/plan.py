@@ -73,7 +73,7 @@ def plan_for_tp(sc: Scenario, model: Model, gpu: GPU, tp: int) -> Plan:
             hi = mid - 1
     b = lo
     tpot = tpot_s(model, gpu, sc.quant, sc.kv_dtype, tp, b, avg_ctx)
-    pre = prefill_s(model, gpu, tp, sc.avg_prompt_tokens)
+    pre = prefill_s(model, gpu, sc.quant, tp, sc.avg_prompt_tokens)
     mu = b / (sc.avg_output_tokens * tpot + b * pre)
     # Время до первого токена: свой prefill плюс ожидание prefill-ов, пришедших раньше
     rho_prefill = min(mu * sc.target_utilization * pre, 0.95)

@@ -6,7 +6,8 @@ const html = fs.readFileSync(path.join(__dirname, "..", "docs", "index.html"), "
 const engine = html.split("// ENGINE START")[1].split("// ENGINE END")[0];
 const run = new Function(engine + "\nreturn { MODELS, GPUS, ECON, compute };")();
 const s = JSON.parse(fs.readFileSync(0, "utf8"));
-const econ = { ...run.ECON, apiIn: s.apiIn ?? run.ECON.apiIn, apiOut: s.apiOut ?? run.ECON.apiOut };
+const econ = { ...run.ECON, apiIn: s.apiIn ?? run.ECON.apiIn, apiOut: s.apiOut ?? run.ECON.apiOut, apiCached: s.apiCached ?? undefined,
+  reserved: !!s.reserved, reservedDiscount: s.reservedDiscount ?? run.ECON.reservedDiscount, infra: s.infra ?? 0 };
 const r = run.compute(s, run.MODELS, run.GPUS, econ);
 const out = {};
 for (const { name, p, c } of r.rows) {

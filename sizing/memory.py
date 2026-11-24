@@ -20,6 +20,8 @@ def weights_gb(model: Model, quant: str) -> float:
 
 
 def kv_bytes_per_token(model: Model, kv_dtype: str) -> int:
+    if model.kv_bytes_per_token_fp16:   # MLA и сжатое внимание: размер задан явно
+        return round(model.kv_bytes_per_token_fp16 * KV_BYTES[kv_dtype] / 2)
     return 2 * model.layers * model.kv_heads * model.head_dim * KV_BYTES[kv_dtype]
 
 

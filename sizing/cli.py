@@ -29,13 +29,15 @@ def cmd_scenario(path: Path, only: list[str] | None) -> int:
     return report(load_scenario(path), only)
 
 
-def report(sc, only: list[str] | None = None) -> int:
+def report(sc, only: list[str] | None = None, econ_override: dict | None = None) -> int:
     models = load_models()
     gpus, econ = load_gpus()
+    econ.update(econ_override or {})
     if sc.model not in models:
         print(f"модель {sc.model} не найдена в config/models.yaml")
         return 1
-    m = models[sc.model]
+    from .plan import effective_model
+    m = effective_model(sc, models[sc.model])
     names = only or sc.gpus or list(gpus)
 
     print(f"Сценарий: {sc.name}")
@@ -47,7 +49,7 @@ def report(sc, only: list[str] | None = None) -> int:
     print(f"Цели: время до первого токена до {sc.target_ttft_s} с, на токен до {sc.target_tpot_ms:.0f} мс; "
           f"резерв N+1: {'да' if sc.ha else 'нет'}\n")
 
-    header = f"{'GPU':<11}{'TP':>3}{'реплик':>8}{'GPU':>5}{'батч':>6}{'TTFT, с':>9}{'мс/ток':>8}   {'своё 3 г':>9}{'облако 3 г':>12}{'API 3 г':>9}   {'$/1М ток. своё':>15}"
+    header = f"{'GPU':<13}{'TP':>3}{'реплик':>8}{'GPU':>5}{'батч':>6}{'TTFT, с':>9}{'мс/ток':>8}   {'своё 3 г':>9}{'облако 3 г':>12}{'API 3 г':>9}   {'$/1М ток. своё':>15}"
     print(header)
     print("-" * len(header))
     feasible = []
@@ -56,7 +58,7 @@ def report(sc, only: list[str] | None = None) -> int:
         g = gpus[name]
         p = best_plan(sc, m, g)
         if not p.feasible:
-            print(f"{name:<11}  не подходит: {p.reasons[-1] if p.reasons else ''}")
+            print(f"{name:<13}  не подходит: {p.reasons[-1] if p.reasons else ''}")
             continue
         c = estimate(sc, g, p, econ)
         if g.production:
@@ -65,7 +67,7 @@ def report(sc, only: list[str] | None = None) -> int:
         if p.batch < 4:
             mark += "  !малый батч"
             small_batch = True
-        print(f"{name:<11}{p.tp:>3}{p.replicas:>8}{p.total_gpus:>5}{p.batch:>6}{p.ttft_s:>9.2f}{p.tpot_ms:>8.0f}   "
+        print(f"{name:<13}{p.tp:>3}{p.replicas:>8}{p.total_gpus:>5}{p.batch:>6}{p.ttft_s:>9.2f}{p.tpot_ms:>8.0f}   "
               f"{money(c.onprem_total):>9}{money(c.cloud_total):>12}{money(c.api_total):>9}   {c.per_m_tokens(c.onprem_total):>15.3f}{mark}")
 
     if any(not gpus[n].production for n in names):
@@ -99,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("-h", "--help", action="help", help="показать эту справку")
     d = Scenario(name="", description="", model="qwen2.5-32b")
     c.add_argument("--model", default=d.model, help=f"модель из config/models.yaml (по умолчанию {d.model}); список: python -m sizing.cli models")
-    c.add_argument("--quant", default=d.quant, choices=["fp16", "bf16", "fp8", "int8", "int4"], help="квантизация весов: int4 в 4 раза меньше памяти, чем fp16")
+    c.add_argument("--quant", default=d.quant, choices=["fp16", "bf16", "fp8", "int8", "int4", "fp4"], help="квантизация весов: int4 и fp4 в 4 раза меньше памяти, чем fp16; fp8 и fp4 ускоряют вычисления на GPU с их поддержкой")
     c.add_argument("--kv-dtype", default=d.kv_dtype, choices=["fp16", "bf16", "fp8"], help="тип KV-кэша: fp8 вдвое меньше памяти под контекст")
     c.add_argument("--users", type=int, default=d.users, help=f"число пользователей (по умолчанию {d.users})")
     c.add_argument("--requests-per-day", type=float, default=d.requests_per_user_per_day, help="запросов на пользователя в день")
@@ -111,6 +113,14 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--tpot", type=float, default=d.target_tpot_ms, help="целевое время на токен, мс")
     c.add_argument("--no-ha", action="store_true", help="без резервной реплики")
     c.add_argument("--working-hours", action="store_true", help="облако арендуется только в рабочие часы")
+    c.add_argument("--prefix-cache", type=float, default=0.0, help="доля промпта из кэша префиксов, от 0 до 0.99 (агенты: 0.8–0.9)")
+    c.add_argument("--kv-kb", type=float, default=0.0, help="KV-кэш на токен, КБ, вручную (MLA, сжатое внимание); 0: по формуле")
+    c.add_argument("--api-in", type=float, help="цена API за 1М входных токенов")
+    c.add_argument("--api-out", type=float, help="цена API за 1М выходных токенов")
+    c.add_argument("--api-cached", type=float, help="цена API за 1М кэшированных входных токенов")
+    c.add_argument("--cloud-reserved", action="store_true", help="облако зарезервировано на весь срок, оплата круглосуточно со скидкой")
+    c.add_argument("--reserved-discount", type=float, help="скидка за резерв, доля от 0 до 1 (по умолчанию из config/gpus.yaml)")
+    c.add_argument("--infra-share", type=float, help="сеть, СХД и размещение как доля стоимости оборудования, например 0.15")
     c.add_argument("--gpu", action="append", help="ограничить список GPU; можно указать несколько раз")
     k = sub.add_parser("kv")
     k.add_argument("model")
@@ -132,11 +142,18 @@ def main(argv: list[str] | None = None) -> int:
                 name="Расчёт из командной строки", description="", model=a.model, quant=a.quant, kv_dtype=a.kv_dtype,
                 users=a.users, requests_per_user_per_day=a.requests_per_day, llm_calls_per_request=a.calls_per_request,
                 peak_hour_share=a.peak_share, avg_prompt_tokens=a.prompt, avg_output_tokens=a.output,
-                target_ttft_s=a.ttft, target_tpot_ms=a.tpot, ha=not a.no_ha, always_on=not a.working_hours))
+                target_ttft_s=a.ttft, target_tpot_ms=a.tpot, ha=not a.no_ha, always_on=not a.working_hours,
+                prefix_cache_hit=a.prefix_cache, kv_kb_per_token=a.kv_kb, api_usd_per_m_input=a.api_in,
+                api_usd_per_m_output=a.api_out, api_usd_per_m_cached=a.api_cached))
         except ValueError as exc:
             print(f"ошибка в параметрах: {exc}")
             return 2
-        return report(sc, a.gpu)
+        econ_override = {"cloud_reserved": a.cloud_reserved}
+        if a.reserved_discount is not None:
+            econ_override["reserved_discount"] = a.reserved_discount
+        if a.infra_share is not None:
+            econ_override["infra_share"] = a.infra_share
+        return report(sc, a.gpu, econ_override)
     if a.cmd == "kv":
         m = load_models()[a.model]
         per_tok = kv_bytes_per_token(m, a.kv_dtype)
@@ -147,11 +164,15 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "models":
         for m in load_models().values():
             moe = f", MoE {m.experts_per_token} из {m.experts} экспертов" if m.is_moe else ""
-            print(f"{m.name:<15} {m.params_b:>5} млрд, слоёв {m.layers}, KV heads {m.kv_heads}{moe}")
+            attn = (f"MLA, KV-кэш {m.kv_bytes_per_token_fp16 / 1024:.0f} КБ на токен в FP16" if m.kv_bytes_per_token_fp16
+                    else f"KV heads {m.kv_heads}")
+            print(f"{m.name:<15} {m.params_b:>5} млрд, слоёв {m.layers}, {attn}{moe}")
     elif a.cmd == "gpus":
         gpus, _ = load_gpus()
         for g in gpus.values():
-            print(f"{g.name:<11} {g.vram_gb:>4.0f} ГБ, {g.bandwidth_tbs:.2f} ТБ/с, {g.fp16_tflops:.0f} TFLOPS FP16, {g.tdp_w:.0f} Вт  {g.note}")
+            low = ", ".join(f"{v:.0f} {k}" for k, v in (("FP8", g.fp8_tflops), ("FP4", g.fp4_tflops)) if v)
+            print(f"{g.name:<13}{g.vram_gb:>4.0f} ГБ, {g.bandwidth_tbs:.2f} ТБ/с, {g.fp16_tflops:.0f} TFLOPS FP16"
+                  f"{', ' + low if low else ''}, {g.tdp_w:.0f} Вт  {g.note}")
     return 0
 
 

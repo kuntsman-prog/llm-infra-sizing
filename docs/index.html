@@ -55,7 +55,7 @@ form.panel { padding: 16px; display: grid; gap: 14px; position: sticky; top: 12p
 @media (max-width: 900px) { form.panel { position: static; } }
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
 legend { font-family: var(--font-display); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); padding: 0 0 4px; }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
 label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
 input, select { font: 14px var(--font-mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; width: 100%; }
 input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -150,13 +150,14 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
       <div class="row">
         <label for="quant">Веса
           <select id="quant">
-            <option value="fp16">fp16</option><option value="bf16">bf16</option><option value="fp8">fp8</option><option value="int8">int8</option><option value="int4">int4</option>
+            <option value="fp16">fp16</option><option value="bf16">bf16</option><option value="fp8">fp8</option><option value="int8">int8</option><option value="int4">int4</option><option value="fp4">fp4 (NVFP4)</option>
           </select>
         </label>
         <label for="kv">KV-кэш
           <select id="kv"><option value="fp16">fp16</option><option value="bf16">bf16</option><option value="fp8">fp8</option></select>
         </label>
       </div>
+      <label for="kvkb">KV-кэш на токен, КБ, вручную (MLA, сжатое внимание)<input id="kvkb" type="number" min="0" step="any" placeholder="по формуле модели"></label>
     </fieldset>
     <fieldset>
       <legend>Нагрузка</legend>
@@ -172,8 +173,11 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
         <label for="prompt">Промпт, токенов<input id="prompt" type="number" min="1" step="1"></label>
         <label for="output">Ответ, токенов<input id="output" type="number" min="1" step="1"></label>
       </div>
-      <label for="days">Рабочих дней в месяц<input id="days" type="number" min="1" max="31" step="1"></label>
-      <p class="hint"><b>Вызовы:</b> чат 1, RAG 1–2, агент 3–10 (план, вызовы инструментов, проверка). <b>Пиковый час:</b> 0.2 значит, что 20% дневных запросов приходят в самый нагруженный час; для офисного графика типично 0.15–0.25.</p>
+      <div class="row">
+        <label for="days">Рабочих дней в месяц<input id="days" type="number" min="1" max="31" step="1"></label>
+        <label for="prefix">Промпт из кэша префиксов, %<input id="prefix" type="number" min="0" max="99" step="5" value="0"></label>
+      </div>
+      <p class="hint"><b>Вызовы:</b> чат 1, RAG 1–2, агент 3–10 (план, вызовы инструментов, проверка). <b>Пиковый час:</b> 0.2 значит, что 20% дневных запросов приходят в самый нагруженный час; для офисного графика типично 0.15–0.25. <b>Кэш префиксов:</b> какая часть промпта повторяется между вызовами (системная инструкция, история шагов агента); у агентов 80–90%.</p>
     </fieldset>
     <fieldset>
       <legend>Цели по скорости</legend>
@@ -194,6 +198,13 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
         <label for="api-in">API, $ за 1М входных<input id="api-in" type="number" min="0" step="0.01"></label>
         <label for="api-out">API, $ за 1М выходных<input id="api-out" type="number" min="0" step="0.01"></label>
       </div>
+      <div class="row">
+        <label for="api-cached">API, $ за 1М кэшированных<input id="api-cached" type="number" min="0" step="0.01" placeholder="как входные"></label>
+        <label for="cloudmode">Облако
+          <select id="cloudmode"><option value="ondemand">по требованию</option><option value="reserved">резерв на весь срок</option></select>
+        </label>
+      </div>
+      <label for="resdisc">Скидка за резерв в облаке, %<input id="resdisc" type="number" min="0" max="90" step="5" value="30"></label>
       <p class="hint">Цены GPU и аренды правятся в таблице под результатами. Что означает каждое поле, описано в пояснениях.</p>
     </fieldset>
     <details class="adv">
@@ -211,7 +222,10 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
           <label for="memEff">Эффективность памяти, %<input id="memEff" type="number" min="10" max="100" step="5" value="60"></label>
           <label for="cmpEff">Эффективность вычислений, %<input id="cmpEff" type="number" min="10" max="100" step="5" value="40"></label>
         </div>
-        <label for="util">Целевая загрузка реплик в пик, %<input id="util" type="number" min="10" max="100" step="5" value="70"></label>
+        <div class="row">
+          <label for="util">Целевая загрузка реплик в пик, %<input id="util" type="number" min="10" max="100" step="5" value="70"></label>
+          <label for="infra">Сеть, СХД и размещение, % к оборудованию<input id="infra" type="number" min="0" step="5" value="0"></label>
+        </div>
         <p class="hint">Значения по умолчанию консервативны: хорошо настроенный движок даёт 70–80% по памяти и 50–60% по вычислениям, что уменьшает число GPU на 20–30%. При ставке дисконтирования 0 затраты номинальные.</p>
       </div>
     </details>
@@ -258,8 +272,8 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
           <h4>Модель</h4>
           <dl>
             <dt>Модель</dt><dd>Открытая модель и число её параметров. MoE (смесь экспертов): на каждый токен работает лишь часть сети, «активные» параметры, поэтому генерация быстрее, но память нужна под все веса.</dd>
-            <dt>Веса</dt><dd>Формат хранения весов. fp16 и bf16: 2 байта на параметр, эталон качества. fp8 и int8: 1 байт, потери качества обычно малы. int4: около 0,5 байта, память в 4 раза меньше, но качество нужно проверить на своих задачах.</dd>
-            <dt>KV-кэш</dt><dd>Рабочая память модели о контексте запроса: для каждого токена каждый слой хранит ключи и значения внимания. fp8 вдвое меньше fp16, значит на GPU помещается больше одновременных запросов.</dd>
+            <dt>Веса</dt><dd>Формат хранения весов. fp16 и bf16: 2 байта на параметр, эталон качества. fp8 и int8: 1 байт, потери качества обычно малы. int4 (AWQ, GPTQ): около 0,5 байта, память в 4 раза меньше, вычисления идут в FP16. fp4 (NVFP4): столько же памяти, а на Blackwell (B200, B300, RTX PRO 6000) ещё и вычисления на тензорных ядрах FP4. Качество int4 и fp4 нужно проверить на своих задачах.</dd>
+            <dt>KV-кэш</dt><dd>Рабочая память модели о контексте запроса: для каждого токена каждый слой хранит ключи и значения внимания. fp8 вдвое меньше fp16, значит на GPU помещается больше одновременных запросов. Для моделей с MLA (DeepSeek-V3) и других схем сжатого внимания размер на токен задан явно; для своей модели его можно ввести вручную в КБ, тогда формула по KV heads не используется.</dd>
           </dl>
           <h4>Нагрузка</h4>
           <dl>
@@ -267,6 +281,7 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
             <dt>Вызовов модели на запрос</dt><dd>Для простого чата 1. Агент или RAG с переформулировкой вопроса вызывает модель несколько раз на одну задачу пользователя.</dd>
             <dt>Доля трафика в пиковый час</dt><dd>Какая часть дневных вызовов приходится на самый нагруженный час. 0.2 означает 20%; для рабочего дня типично 0.15–0.25. Число реплик считается по пику, а не по среднему.</dd>
             <dt>Промпт и ответ, токенов</dt><dd>Средняя длина входа (инструкция, история диалога, найденные фрагменты документов) и ответа. Токен примерно равен 3–4 символам русского текста, точнее зависит от модели.</dd>
+            <dt>Промпт из кэша префиксов</dt><dd>Какая часть промпта совпадает с началом предыдущих вызовов: системная инструкция, общий контекст, история шагов агента. Эта часть уже лежит в KV-кэше, и обработка промпта считается только для новой части, поэтому время до первого токена и нагрузка падают. У агентных циклов обычно 80–90%. Память под KV-кэш калькулятор при этом не уменьшает: это осторожная оценка.</dd>
             <dt>Рабочих дней в месяц</dt><dd>Нужно для месячного объёма вызовов, стоимости API и аренды облака только в рабочие часы.</dd>
           </dl>
           <h4>Цели и экономика</h4>
@@ -275,14 +290,16 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
             <dt>На токен, мс (TPOT)</dt><dd>Скорость «печати» ответа. 50–60 мс на токен это 17–20 токенов в секунду, быстрее, чем человек читает.</dd>
             <dt>Резервная реплика (N+1)</dt><dd>Одна копия модели сверх нужного, чтобы отказ сервера или обновление не снижали качество сервиса.</dd>
             <dt>Облако круглосуточно</dt><dd>Если снять отметку, аренда считается только в рабочие часы: 12 часов в рабочий день. Расчёт предполагает почасовую оплату по требованию (on-demand), когда остановленные машины не оплачиваются. При резервировании на год или три цена часа ниже, но платить нужно и за простой.</dd>
+            <dt>Облако: по требованию или резерв</dt><dd>«По требованию»: оплачиваются только часы работы. «Резерв на весь срок»: оплата круглосуточно, но со скидкой (по умолчанию 30%; на рынке от 15% до 45% в зависимости от карты и срока). Отметка «Облако круглосуточно» в режиме резерва не действует.</dd>
             <dt>Электричество</dt><dd>Цена киловатт-часа для своего оборудования. Учтены потребление сервера (в 1,6 раза больше TDP GPU) и PUE дата-центра 1,5.</dd>
-            <dt>API, $ за 1М токенов</dt><dd>Цена провайдера за миллион входных и выходных токенов для модели сопоставимого класса. При смене модели вручную цены не меняются: подставьте прайс провайдера для выбранного класса.</dd>
+            <dt>API, $ за 1М токенов</dt><dd>Цена провайдера за миллион входных и выходных токенов для модели сопоставимого класса. При смене модели вручную цены не меняются: подставьте прайс провайдера для выбранного класса. Кэшированные входные токены многие провайдеры продают дешевле обычных: если поле пустое, они считаются по цене входных.</dd>
           </dl>
           <h4>Инженерные допущения</h4>
           <dl>
             <dt>PUE и сервер к TDP</dt><dd>Сколько энергии тратит ЦОД сверх оборудования (1,2–1,3 у современных, 1,6–1,8 у старых) и во сколько раз сервер потребляет больше своих GPU.</dd>
             <dt>Ставка дисконтирования</dt><dd>Приводит будущие ежемесячные платежи к сегодняшним деньгам. Покупка оборудования оплачивается сразу и не дисконтируется, поэтому ставка выше нуля делает облако и API относительно дешевле. При нуле затраты номинальные; для бюджетного решения на 5 лет задайте ставку, принятую в компании.</dd>
             <dt>Эффективность памяти и вычислений</dt><dd>Какую долю паспортной пропускной способности памяти (генерация) и вычислительной мощности (обработка промпта) реально достигает движок инференса. По умолчанию 60% и 40%, это консервативно.</dd>
+            <dt>Сеть, СХД и размещение</dt><dd>Коммутаторы между серверами, системы хранения и место в стойках как доля стоимости оборудования. Процессоры, память, диски и сетевые карты самих серверов уже входят в «Сервер на GPU», электроэнергия считается отдельно. По умолчанию 0.</dd>
             <dt>Целевая загрузка реплик</dt><dd>Насколько загружены копии модели в пиковый час. 70% оставляет запас на всплески; при 90% очередь и время до первого токена растут резко.</dd>
           </dl>
         </div>
@@ -318,7 +335,7 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
       <summary>Цены и характеристики GPU</summary>
       <div class="scroll">
         <table>
-          <thead><tr><th scope="col">GPU</th><th scope="col">Память, ГБ</th><th scope="col">ТБ/с</th><th scope="col">TFLOPS fp16</th><th scope="col">Связь</th><th scope="col">Цена GPU, $</th><th scope="col">Сервер на GPU, $</th><th scope="col">Облако, $/ч</th></tr></thead>
+          <thead><tr><th scope="col">GPU</th><th scope="col">Память, ГБ</th><th scope="col">ТБ/с</th><th scope="col">FP16, TFLOPS</th><th scope="col">FP8</th><th scope="col">FP4</th><th scope="col">Связь</th><th scope="col">Цена GPU, $</th><th scope="col">Сервер на GPU, $</th><th scope="col">Облако, $/ч</th></tr></thead>
           <tbody id="gpu-rows"></tbody>
         </table>
       </div>
@@ -326,9 +343,9 @@ details.adv summary { cursor: pointer; font: 600 13px var(--font-display); lette
     </details>
 
     <div class="panel notes">
-      <p><b>Как считается.</b> Генерация ограничена пропускной способностью памяти: на каждом шаге GPU читает веса и KV-кэш всех запросов батча. Обработка промпта ограничена вычислениями, около 2 × активные параметры FLOP на токен. Батч подбирается максимальным, при котором время на токен укладывается в цель и KV-кэш помещается в память. Реплик столько, чтобы пиковый поток занимал не больше целевой загрузки (по умолчанию 70%) их мощности, плюс резервная при N+1.</p>
+      <p><b>Как считается.</b> Генерация ограничена пропускной способностью памяти: на каждом шаге GPU читает веса и KV-кэш всех запросов батча. Обработка промпта ограничена вычислениями, около 2 × активные параметры FLOP на токен; для весов fp8 и fp4 берётся производительность тензорных ядер этого формата, если GPU его поддерживает. Батч подбирается максимальным, при котором время на токен укладывается в цель и KV-кэш помещается в память. Реплик столько, чтобы пиковый поток занимал не больше целевой загрузки (по умолчанию 70%) их мощности, плюс резервная при N+1.</p>
       <p><b>Упрощения модели.</b> Время до первого токена считается по обработке промпта одного запроса с учётом очереди; чередование обработки промптов и генерации в движке (chunked prefill) не моделируется. Загрузка реплики обработкой промптов берётся по верхней границе (целевая загрузка от предельной мощности), а реальный поток на реплику после округления и резерва меньше, поэтому время до первого токена оценено с запасом. Для MoE-моделей каждый токен проходит только через своих экспертов, поэтому объём вычислений считается по активным параметрам; при этом обработка промпта не может быть быстрее, чем один раз прочитать все веса из памяти, и эта граница учтена. Потери эффективности MoE-ядер покрываются консервативной эффективностью вычислений.</p>
-      <p><b>Точность ±30–50%.</b> Это оценка порядка величины для выбора варианта и бюджета. Перед закупкой нужен нагрузочный тест на vLLM с реальными промптами. Своё оборудование не включает зарплаты эксплуатации, лицензии, налоги и хранилище (веса моделей, журналы, документы для RAG), а облако не включает хранение данных и сетевой трафик. RTX 4090 подходит только для стендов: лицензия драйвера GeForce не разрешает размещение в ЦОД.</p>
+      <p><b>Точность ±30–50%.</b> Это оценка порядка величины для выбора варианта и бюджета. Перед закупкой нужен нагрузочный тест на vLLM с реальными промптами. Своё оборудование не включает зарплаты эксплуатации, лицензии и налоги; сеть между серверами, СХД и размещение добавляются долей в инженерных допущениях. Облако не включает хранение данных и сетевой трафик. RTX 4090 подходит только для стендов: лицензия драйвера GeForce не разрешает размещение в ЦОД.</p>
       <p>Подробное руководство с примерами: <a href="https://github.com/kuntsman-prog/llm-infra-sizing/blob/main/GUIDE.ru.md">GUIDE.ru.md</a>. Исходный код и версия для командной строки: <a href="https://github.com/kuntsman-prog/llm-infra-sizing">github.com/kuntsman-prog/llm-infra-sizing</a>.</p>
     </div>
   </section>
@@ -344,18 +361,29 @@ const MODELS = {
   "qwen3-30b-a3b": { params: 30.5, active: 3.3,  layers: 48, heads: 32, kvHeads: 4, headDim: 128, maxCtx: 131072, experts: 128, expertsPerToken: 8 },
   "llama-3.1-70b": { params: 70.6, active: 70.6, layers: 80, heads: 64, kvHeads: 8, headDim: 128, maxCtx: 131072 },
   "qwen2.5-72b":   { params: 72.7, active: 72.7, layers: 80, heads: 64, kvHeads: 8, headDim: 128, maxCtx: 131072 },
+  // MLA: на токен и слой хранится сжатый вектор 512 + 64 значения: 61 × 576 × 2 байта = 70 272 байта в FP16
+  "deepseek-v3":   { params: 671,  active: 37,   layers: 61, heads: 128, kvHeads: 1, headDim: 128, maxCtx: 163840, experts: 256, expertsPerToken: 8, kvFp16: 70272 },
+  // CSA/HCA: растущий KV-кэш около 9,62 КиБ на токен в BF16; NVFP4-чекпойнт около 865 ГБ (здесь с запасом, около 900 ГБ)
+  "deepseek-v4-pro": { params: 1600, active: 49, layers: 61, heads: 128, kvHeads: 1, headDim: 128, maxCtx: 1048576, experts: 384, expertsPerToken: 6, kvFp16: 9851 },
+  // MLA (512 + 64) и ключи индексатора (128): 78 слоёв × 704 × 2 байта
+  "glm-5.2":       { params: 753,  active: 40,   layers: 78, heads: 64,  kvHeads: 1, headDim: 128, maxCtx: 1048576, experts: 256, expertsPerToken: 8, kvFp16: 109824 },
+  "hy3":           { params: 295,  active: 21,   layers: 80, heads: 64,  kvHeads: 8, headDim: 128, maxCtx: 262144, experts: 192, expertsPerToken: 8 },
 };
+// tflops, fp8, fp4: плотная производительность тензорных ядер; 0 у fp8 или fp4: формат не поддерживается, вычисления в FP16
 const GPUS = {
-  "rtx-4090":  { vram: 24,  bw: 1.0,   tflops: 165, tdp: 450, price: 2000,  platform: 1500, cloud: 0.5, link: "pcie",   production: false },
-  "l4":        { vram: 24,  bw: 0.3,   tflops: 121, tdp: 72,  price: 3000,  platform: 1500, cloud: 0.6, link: "pcie",   production: true },
-  "l40s":      { vram: 48,  bw: 0.864, tflops: 362, tdp: 350, price: 9000,  platform: 3000, cloud: 1.2, link: "pcie",   production: true },
-  "a100-80gb": { vram: 80,  bw: 2.0,   tflops: 312, tdp: 400, price: 15000, platform: 6000, cloud: 1.8, link: "nvlink", production: true },
-  "h100-sxm":  { vram: 80,  bw: 3.35,  tflops: 989, tdp: 700, price: 30000, platform: 8000, cloud: 3.0, link: "nvlink", production: true },
-  "h200":      { vram: 141, bw: 4.8,   tflops: 989, tdp: 700, price: 35000, platform: 8000, cloud: 4.0, link: "nvlink", production: true },
+  "rtx-4090":     { vram: 24,  bw: 1.0,   tflops: 165,  fp8: 330,  fp4: 0,     tdp: 450,  price: 2000,  platform: 1500,  cloud: 0.5, link: "pcie",   production: false },
+  "l4":           { vram: 24,  bw: 0.3,   tflops: 121,  fp8: 242,  fp4: 0,     tdp: 72,   price: 3000,  platform: 1500,  cloud: 0.6, link: "pcie",   production: true },
+  "l40s":         { vram: 48,  bw: 0.864, tflops: 362,  fp8: 733,  fp4: 0,     tdp: 350,  price: 9000,  platform: 3000,  cloud: 1.2, link: "pcie",   production: true },
+  "a100-80gb":    { vram: 80,  bw: 2.0,   tflops: 312,  fp8: 0,    fp4: 0,     tdp: 400,  price: 15000, platform: 6000,  cloud: 1.8, link: "nvlink", production: true },
+  "h100-sxm":     { vram: 80,  bw: 3.35,  tflops: 989,  fp8: 1979, fp4: 0,     tdp: 700,  price: 30000, platform: 8000,  cloud: 3.0, link: "nvlink", production: true },
+  "h200":         { vram: 141, bw: 4.8,   tflops: 989,  fp8: 1979, fp4: 0,     tdp: 700,  price: 35000, platform: 8000,  cloud: 4.0, link: "nvlink", production: true },
+  "rtx-pro-6000": { vram: 96,  bw: 1.6,   tflops: 500,  fp8: 1000, fp4: 2000,  tdp: 600,  price: 9000,  platform: 3000,  cloud: 2.2, link: "pcie",   production: true },
+  "b200":         { vram: 180, bw: 7.7,   tflops: 2250, fp8: 4500, fp4: 9000,  tdp: 1000, price: 40000, platform: 10000, cloud: 5.9, link: "nvlink", production: true },
+  "b300":         { vram: 268, bw: 8.0,   tflops: 2250, fp8: 4500, fp4: 13500, tdp: 1200, price: 45000, platform: 10000, cloud: 6.7, link: "nvlink", production: true },
 };
-const ECON = { years: 3, kwh: 0.10, pue: 1.5, serverOverhead: 1.6, maintenance: 0.10, apiIn: 0.50, apiOut: 1.50, discount: 0 };
-const BYTES_PER_PARAM = { fp16: 2, bf16: 2, fp8: 1, int8: 1, int4: 0.5 };
-const QUANT_OVERHEAD = { int4: 1.05 };
+const ECON = { years: 3, kwh: 0.10, pue: 1.5, serverOverhead: 1.6, maintenance: 0.10, apiIn: 0.50, apiOut: 1.50, discount: 0, infra: 0, reserved: false, reservedDiscount: 0.30 };
+const BYTES_PER_PARAM = { fp16: 2, bf16: 2, fp8: 1, int8: 1, int4: 0.5, fp4: 0.5 };
+const QUANT_OVERHEAD = { int4: 1.05, fp4: 1.125 };  // масштабы групповой квантизации; у NVFP4 масштаб FP8 на каждые 16 весов
 const KV_BYTES = { fp16: 2, bf16: 2, fp8: 1 };
 const GB = 1e9, VRAM_UTIL = 0.90, RUNTIME_RESERVE_GB = 1.5;
 // Инженерные допущения: доля паспортной пропускной способности памяти и вычислений, которую достигает движок, и целевая загрузка реплик в пик
@@ -366,7 +394,11 @@ const TP_OPTIONS = [1, 2, 4, 8], GPUS_PER_NODE = 8, HOURS_PER_YEAR = 24 * 365;
 const peakRps = s => s.users * s.rpd * s.calls * s.peak / 3600;
 const monthlyCalls = s => s.users * s.rpd * s.calls * s.days;
 const weightsGB = (m, q) => m.params * BYTES_PER_PARAM[q] * (QUANT_OVERHEAD[q] || 1);
-const kvBytesPerToken = (m, kv) => 2 * m.layers * m.kvHeads * m.headDim * KV_BYTES[kv];
+// MLA и сжатое внимание: размер KV-кэша на токен задан явно (kvFp16), иначе формула GQA
+const kvBytesPerToken = (m, kv) => m.kvFp16 ? Math.round(m.kvFp16 * KV_BYTES[kv] / 2) : 2 * m.layers * m.kvHeads * m.headDim * KV_BYTES[kv];
+// FP8 и FP4 считаются на своих тензорных ядрах, если GPU их поддерживает; INT4 и INT8 как квантизация только весов: вычисления в FP16
+const computeTflops = (g, q) => (q === "fp8" && g.fp8) ? g.fp8 : (q === "fp4" && g.fp4) ? g.fp4 : g.tflops;
+const effectiveModel = (s, m) => s.kvKb > 0 ? { ...m, kvFp16: Math.round(s.kvKb * 1024 * 2 / KV_BYTES[s.kv]) } : m;
 const kvGBPerSeq = (m, kv, tokens) => kvBytesPerToken(m, kv) * tokens / GB;
 const kvCapacityGB = (m, q, vram, tp) => tp * (vram * VRAM_UTIL - RUNTIME_RESERVE_GB) - weightsGB(m, q);
 
@@ -380,18 +412,19 @@ const comm = (g, tp) => 1 + TP_COMM[g.link] * (tp - 1);
 function tpotS(m, g, q, kv, tp, batch, avgCtx) {
   const bytes = weightsGB(m, q) * GB * moeFraction(m, batch) + batch * avgCtx * kvBytesPerToken(m, kv);
   const tMem = bytes / (tp * g.bw * 1e12 * ASSUME.memEff);
-  const tCmp = 2 * m.active * 1e9 * batch / (tp * g.tflops * 1e12 * ASSUME.cmpEff);
+  const tCmp = 2 * m.active * 1e9 * batch / (tp * computeTflops(g, q) * 1e12 * ASSUME.cmpEff);
   return Math.max(tMem, tCmp) * comm(g, tp);
 }
 // Prefill: вычисления по активным параметрам (каждый токен идёт только через своих экспертов),
 // но не быстрее, чем один раз прочитать все веса из памяти
 function prefillS(m, g, q, tp, prompt) {
-  const tCmp = 2 * m.active * 1e9 * prompt / (tp * g.tflops * 1e12 * ASSUME.cmpEff);
+  const tCmp = 2 * m.active * 1e9 * prompt / (tp * computeTflops(g, q) * 1e12 * ASSUME.cmpEff);
   const tMem = weightsGB(m, q) * GB / (tp * g.bw * 1e12 * ASSUME.memEff);
   return Math.max(tCmp, tMem) * comm(g, tp);
 }
 
 function planForTp(s, m, g, tp) {
+  m = effectiveModel(s, m);
   const p = { feasible: false, tp, reasons: [] };
   if (m.heads % tp) { p.reasons.push(`TP=${tp}: число attention heads (${m.heads}) не делится на ${tp}`); return p; }
   const ctx = s.prompt + s.output;
@@ -411,7 +444,8 @@ function planForTp(s, m, g, tp) {
   }
   const b = lo;
   const tpot = tpotS(m, g, s.quant, s.kv, tp, b, avgCtx);
-  const pre = prefillS(m, g, s.quant, tp, s.prompt);
+  // Кэш префиксов: повторяющееся начало промпта уже в KV-кэше, prefill считается только для новой части
+  const pre = prefillS(m, g, s.quant, tp, s.prompt * (1 - (s.prefixHit || 0)));
   const mu = b / (s.output * tpot + b * pre);
   // mu: предельная пропускная способность реплики; в пик она загружена не больше чем на ASSUME.util
   const rho = Math.min(mu * ASSUME.util * pre, 0.95);
@@ -434,14 +468,17 @@ function estimate(s, g, p, e) {
   // Дисконтирование: ежемесячные платежи приводятся к сегодняшнему дню; покупка оборудования платится сразу
   const dm = Math.pow(1 + (e.discount || 0), 1 / 12) - 1;
   const pv = dm > 0 ? (1 - Math.pow(1 + dm, -months)) / dm / months : 1;
-  const capex = p.totalGpus * (g.price + g.platform);
+  const capex = p.totalGpus * (g.price + g.platform) * (1 + (e.infra || 0));
   const powerKw = p.totalGpus * g.tdp / 1000 * e.serverOverhead * e.pue;
   const energy = powerKw * HOURS_PER_YEAR * e.years * e.kwh;
   const maint = capex * e.maintenance * e.years;
-  const hours = s.always ? HOURS_PER_YEAR / 12 : s.days * 12;
-  const cloud = p.totalGpus * g.cloud * hours * months;
+  // Облако: по требованию (только оплаченные часы) или резерв на весь срок (круглосуточно со скидкой)
+  const hours = (e.reserved || s.always) ? HOURS_PER_YEAR / 12 : s.days * 12;
+  const rate = e.reserved ? g.cloud * (1 - (e.reservedDiscount || 0)) : g.cloud;
+  const cloud = p.totalGpus * rate * hours * months;
   const calls = monthlyCalls(s) * months;
-  const api = calls * (s.prompt * e.apiIn + s.output * e.apiOut) / 1e6;
+  const hit = s.prefixHit || 0, cached = e.apiCached ?? e.apiIn;
+  const api = calls * (s.prompt * ((1 - hit) * e.apiIn + hit * cached) + s.output * e.apiOut) / 1e6;
   const tokensM = calls * (s.prompt + s.output) / 1e6;
   return { capex, own: capex + (energy + maint) * pv, cloud: cloud * pv, api: api * pv, tokensM };
 }
@@ -459,10 +496,17 @@ function validate(s) {
     if (!(s[k] >= 10 && s[k] <= 100)) return { field: k, msg: `Значение «${label}» задаётся в процентах от 10 до 100.` };
   if (!(s.maint >= 0)) return { field: "maint", msg: "Обслуживание не может быть отрицательным." };
   if (!(s.disc >= 0 && s.disc < 100)) return { field: "disc", msg: "Ставка дисконтирования задаётся в процентах от 0 до 99." };
+  if (s.prefixPct !== undefined) {
+    if (!(s.prefixPct >= 0 && s.prefixPct < 100)) return { field: "prefixPct", msg: "Доля промпта из кэша префиксов задаётся в процентах от 0 до 99." };
+    if (!(s.kvKb >= 0)) return { field: "kvKb", msg: "KV-кэш на токен не может быть отрицательным; оставьте поле пустым, чтобы считать по формуле модели." };
+    if (!(s.resDisc >= 0 && s.resDisc <= 90)) return { field: "resDisc", msg: "Скидка за резерв задаётся в процентах от 0 до 90." };
+    if (!(s.infraPct >= 0)) return { field: "infraPct", msg: "Доля сети, СХД и размещения не может быть отрицательной." };
+    if (s.apiCached !== null && !(s.apiCached >= 0)) return { field: "apiCached", msg: "Цена кэшированных токенов не может быть отрицательной; оставьте поле пустым, чтобы считать как входные." };
+  }
   return null;
 }
 function compute(s, models, gpus, econ) {
-  const m = models[s.model];
+  const m = effectiveModel(s, models[s.model]);
   const rows = Object.entries(gpus).map(([name, g]) => {
     const p = bestPlan(s, m, g);
     return { name, g, p, c: p.feasible ? estimate(s, g, p, econ) : null };
@@ -477,15 +521,16 @@ function compute(s, models, gpus, econ) {
 
 const PRESETS = {
   assistant: { label: "Ассистент с RAG", desc: "Ассистент по внутренним документам для 2 000 сотрудников. <b>Почему так:</b> 1 вызов, потому что ассистент сразу отвечает на вопрос; промпт 3 000 токенов, потому что в него входят найденные фрагменты документов; цели 2 с и 60 мс, чтобы ответ начинался быстро и печатался быстрее чтения; резерв нужен, потому что сотрудники ждут ответа.",
-    model: "qwen2.5-32b", quant: "int4", kv: "fp16", users: 2000, rpd: 15, calls: 1, peak: 0.2, prompt: 3000, output: 350, ttft: 2, tpot: 60, ha: true, always: true, apiIn: 0.5, apiOut: 1.5 },
+    model: "qwen2.5-32b", quant: "int4", kv: "fp16", users: 2000, rpd: 15, calls: 1, peak: 0.2, prompt: 3000, output: 350, ttft: 2, tpot: 60, ha: true, always: true, apiIn: 0.5, apiOut: 1.5, prefixPct: 0, kvKb: "", apiCached: "" },
   agents: { label: "Агентная платформа", desc: "300 пользователей ставят агентам задачи. <b>Почему так:</b> 6 вызовов на задачу, потому что агент строит план, несколько раз вызывает инструменты, разбирает их результаты и проверяет итог; промпт 12 000 токенов, потому что в нём история шагов и ответы инструментов; модель 72 млрд, потому что агенту нужны устойчивые рассуждения; веса fp8 экономят память при малой потере качества.",
-    model: "qwen2.5-72b", quant: "fp8", kv: "fp8", users: 300, rpd: 10, calls: 6, peak: 0.2, prompt: 12000, output: 500, ttft: 5, tpot: 50, ha: true, always: true, apiIn: 1.0, apiOut: 3.0 },
+    model: "qwen2.5-72b", quant: "fp8", kv: "fp8", users: 300, rpd: 10, calls: 6, peak: 0.2, prompt: 12000, output: 500, ttft: 5, tpot: 50, ha: true, always: true, apiIn: 1.0, apiOut: 3.0, prefixPct: 0, kvKb: "", apiCached: "" },
   documents: { label: "Пакетная проверка документов", desc: "5 000 документов в день. <b>Почему так:</b> 8 вызовов на документ: разбор разделов и проверки по каждому; цели 30 с и 200 мс, потому что результат никто не ждёт в моменте; MoE-модель генерирует быстро и дёшево; облако только в рабочие часы и без резерва: при сбое пакет дообрабатывается позже.",
-    model: "qwen3-30b-a3b", quant: "fp16", kv: "fp16", users: 5000, rpd: 1, calls: 8, peak: 0.15, prompt: 6000, output: 400, ttft: 30, tpot: 200, ha: false, always: false, apiIn: 0.5, apiOut: 1.5 },
+    model: "qwen3-30b-a3b", quant: "fp16", kv: "fp16", users: 5000, rpd: 1, calls: 8, peak: 0.15, prompt: 6000, output: 400, ttft: 30, tpot: 200, ha: false, always: false, apiIn: 0.5, apiOut: 1.5, prefixPct: 0, kvKb: "", apiCached: "" },
 };
 const $ = id => document.getElementById(id);
 const NUM_FIELDS = { users: "users", rpd: "rpd", calls: "calls", peak: "peak", prompt: "prompt", output: "output", ttft: "ttft", tpot: "tpot", days: "days", years: "years", kwh: "kwh", "api-in": "apiIn", "api-out": "apiOut",
-  pue: "pue", overhead: "overhead", maint: "maint", disc: "disc", memEff: "memEff", cmpEff: "cmpEff", util: "util" };
+  pue: "pue", overhead: "overhead", maint: "maint", disc: "disc", memEff: "memEff", cmpEff: "cmpEff", util: "util",
+  prefix: "prefixPct", kvkb: "kvKb", "api-cached": "apiCached", resdisc: "resDisc", infra: "infraPct" };
 const gpus = JSON.parse(JSON.stringify(GPUS));
 let activePreset = "assistant";
 
@@ -499,9 +544,14 @@ function fillForm(p) {
   for (const [id, key] of Object.entries(NUM_FIELDS)) if (key in p) $(id).value = p[key];
   $("ha").checked = p.ha; $("always").checked = p.always;
 }
+const OPTIONAL = new Set(["kvKb", "apiCached"]);
 function readForm() {
   const s = { model: $("model").value, quant: $("quant").value, kv: $("kv").value, ha: $("ha").checked, always: $("always").checked };
-  for (const [id, key] of Object.entries(NUM_FIELDS)) s[key] = parseFloat($(id).value);
+  for (const [id, key] of Object.entries(NUM_FIELDS)) {
+    const v = parseFloat($(id).value);
+    s[key] = OPTIONAL.has(key) && Number.isNaN(v) ? null : v;
+  }
+  s.prefixHit = s.prefixPct / 100; s.kvKb = s.kvKb || 0; s.reserved = $("cloudmode").value === "reserved";
   return s;
 }
 function renderPresets() {
@@ -518,7 +568,7 @@ function renderGpuTable() {
   $("gpu-rows").innerHTML = "";
   for (const [name, g] of Object.entries(gpus)) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td class="name">${name}${g.production ? "" : '<span class="pill warn">стенд</span>'}</td><td>${g.vram}</td><td>${g.bw}</td><td>${g.tflops}</td><td>${g.link === "nvlink" ? "NVLink" : "PCIe"}</td>`;
+    tr.innerHTML = `<td class="name">${name}${g.production ? "" : '<span class="pill warn">стенд</span>'}</td><td>${g.vram}</td><td>${g.bw}</td><td>${g.tflops}</td><td>${g.fp8 || "нет"}</td><td>${g.fp4 || "нет"}</td><td>${g.link === "nvlink" ? "NVLink" : "PCIe"}</td>`;
     for (const key of ["price", "platform", "cloud"]) {
       const td = document.createElement("td"), inp = document.createElement("input");
       inp.type = "number"; inp.min = "0"; inp.step = key === "cloud" ? "0.1" : "100"; inp.value = g[key];
@@ -541,7 +591,9 @@ function update() {
     return;
   }
   $("error").hidden = true;
-  const econ = { ...ECON, years: s.years, kwh: s.kwh, apiIn: s.apiIn, apiOut: s.apiOut, pue: s.pue, serverOverhead: s.overhead, maintenance: s.maint / 100, discount: s.disc / 100 };
+  const econ = { ...ECON, years: s.years, kwh: s.kwh, apiIn: s.apiIn, apiOut: s.apiOut, pue: s.pue, serverOverhead: s.overhead, maintenance: s.maint / 100, discount: s.disc / 100,
+    apiCached: s.apiCached ?? undefined, reserved: s.reserved, reservedDiscount: s.resDisc / 100, infra: s.infraPct / 100 };
+  $("always").disabled = s.reserved; $("resdisc").disabled = !s.reserved;
   Object.assign(ASSUME, { memEff: s.memEff / 100, cmpEff: s.cmpEff / 100, util: s.util / 100 });
   const r = compute(s, MODELS, gpus, econ);
   const ctx = s.prompt + s.output;
@@ -550,14 +602,14 @@ function update() {
   $("t-w").textContent = `${weightsGB(r.m, s.quant).toFixed(1)} ГБ`;
   $("t-w-sub").textContent = `${r.m.params} млрд параметров${r.m.experts ? `, активных ${r.m.active}` : ""}, ${s.quant}`;
   $("t-kv").textContent = `${kvGBPerSeq(r.m, s.kv, ctx).toFixed(2)} ГБ`;
-  $("t-kv-sub").textContent = `${Math.round(kvBytesPerToken(r.m, s.kv) / 1024)} КБ на токен × ${fmtInt(ctx)} токенов`;
+  $("t-kv-sub").textContent = `${Math.round(kvBytesPerToken(r.m, s.kv) / 1024)} КБ на токен${r.m.kvFp16 ? (s.kvKb > 0 ? " (вручную)" : " (MLA)") : ""} × ${fmtInt(ctx)} токенов`;
   $("t-calls").textContent = fmtInt(monthlyCalls(s));
   $("t-tok").textContent = `${fmtInt(monthlyCalls(s) * ctx / 1e6)} млн токенов в месяц`;
   const Y = yearsWord(s.years);
   $("th-own").textContent = `Своё, ${Y}`; $("th-cloud").textContent = `Облако, ${Y}`;
 
   const v = $("verdict");
-  let report = [`Модель ${s.model}, веса ${s.quant}, KV-кэш ${s.kv}; пиковый поток ${peakRps(s).toFixed(2)} вызовов/с; цели: TTFT до ${s.ttft} с, до ${s.tpot} мс на токен; N+1: ${s.ha ? "да" : "нет"}.`];
+  let report = [`Модель ${s.model}, веса ${s.quant}, KV-кэш ${s.kv}; пиковый поток ${peakRps(s).toFixed(2)} вызовов/с; цели: TTFT до ${s.ttft} с, до ${s.tpot} мс на токен; N+1: ${s.ha ? "да" : "нет"}${s.prefixHit ? `; кэш префиксов ${s.prefixPct}%` : ""}${s.kvKb ? `; KV-кэш ${s.kvKb} КБ/токен вручную` : ""}${s.reserved ? `; облако в резерве со скидкой ${s.resDisc}%` : ""}${s.infraPct ? `; сеть, СХД и размещение +${s.infraPct}%` : ""}.`];
   if (!r.bestOwn) {
     v.className = "panel verdict none";
     v.innerHTML = `<h2>Ни один GPU для ЦОД не укладывается в цели</h2><p>Смягчите цели по скорости, выберите модель меньше или более сильную квантизацию. API провайдера за ${Y}: <b>${fmtMoney(r.apiTotal)}</b>.</p>`;

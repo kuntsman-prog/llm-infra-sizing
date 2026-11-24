@@ -60,3 +60,51 @@ models:
     kv_heads: 8
     head_dim: 128
     max_context: 131072
+  deepseek-v3:
+    params_b: 671
+    active_params_b: 37
+    layers: 61
+    attention_heads: 128
+    kv_heads: 1
+    head_dim: 128
+    max_context: 163840
+    experts: 256
+    experts_per_token: 8
+    # Multi-head latent attention: на токен и слой хранится сжатый вектор 512 + 64 значения,
+    # 61 слой × 576 × 2 байта = 70 272 байта; kv_heads и head_dim для расчёта не используются
+    kv_bytes_per_token_fp16: 70272
+  deepseek-v4-pro:
+    params_b: 1600
+    active_params_b: 49
+    layers: 61
+    attention_heads: 128
+    kv_heads: 1
+    head_dim: 128
+    max_context: 1048576
+    experts: 384
+    experts_per_token: 6
+    # Сжатое внимание CSA/HCA: растущий KV-кэш около 9,62 КиБ на токен в BF16 (разбор архитектуры по config.json);
+    # официальный чекпойнт NVFP4 около 865 ГБ: эксперты в FP4, остальное в FP8 (расчёт в fp4 даёт около 900 ГБ, с запасом)
+    kv_bytes_per_token_fp16: 9851
+  glm-5.2:
+    params_b: 753
+    active_params_b: 40
+    layers: 78
+    attention_heads: 64
+    kv_heads: 1
+    head_dim: 128
+    max_context: 1048576
+    experts: 256
+    experts_per_token: 8
+    # MLA (512 + 64) и ключи индексатора разреженного внимания (128): 78 слоёв × 704 × 2 байта
+    kv_bytes_per_token_fp16: 109824
+  hy3:
+    params_b: 295
+    active_params_b: 21
+    layers: 80
+    attention_heads: 64
+    kv_heads: 8
+    head_dim: 128
+    max_context: 262144
+    experts: 192
+    experts_per_token: 8

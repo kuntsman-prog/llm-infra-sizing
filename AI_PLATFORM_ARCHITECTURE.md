@@ -117,7 +117,7 @@ Server guidelines: 8 GPUs per server with NVLink for tensor parallelism; NVMe fo
 
 ## 9. Economics
 
-The calculator shows that the choice depends on volume. An enterprise assistant for 2,000 employees at indicative prices: API about $48K over 3 years, own hardware from $142K, cloud GPUs from $237K. An agent platform on a 70B-class model: API about $192K, own hardware from $724K. Batch document processing during working hours: cloud rental is cheaper than an API. Prices are indicative; the conclusion that holds at any prices: at low volume an API is cheaper, while own GPUs pay off under large stable load or when data must not leave the perimeter.
+The calculator shows that the choice depends on volume. An enterprise assistant for 2,000 employees at indicative prices: API about $48K over 3 years, own hardware from $97K, cloud GPUs from $237K. An agent platform on a 70B-class model: API about $192K, own hardware from $214K. Batch document processing during working hours: cloud rental is cheaper than an API. Prices are indicative; the conclusion that holds at any prices: at low volume an API is cheaper, while own GPUs pay off under large stable load or when data must not leave the perimeter.
 
 Main cost levers:
 - quantization of weights and KV cache (FP8, INT4) with quality checked on the test set;

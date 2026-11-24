@@ -43,45 +43,48 @@ The `ask` mode asks questions one by one: the default is shown in brackets, Ente
 ```
 Memory: weights 17.1 GB; KV cache 256 KB per token, 0.88 GB per 3,350-token request
 
-GPU         TP  replicas GPUs batch TTFT,s ms/tok   own 3y   cloud 3y   API 3y
-rtx-4090     8       3    24   163   1.66     59    $177K      $315K     $48K   *lab only
-l4           8       5    40    35   1.62     59    $252K      $631K     $48K
-l40s         2       4     8    46   1.34     60    $142K      $252K     $48K
-a100-80gb    4       3    12   288   1.09     60    $358K      $568K     $48K
-h100-sxm     1       3     3    60   0.99     33    $161K      $237K     $48K
-h200         1       3     3   123   1.13     41    $181K      $315K     $48K
+GPU           TP replicas GPUs batch TTFT,s ms/tok    own 3y   cloud 3y   API 3y
+rtx-4090       8        3   24   163   1.66     59     $177K      $315K     $48K   *lab only
+l4             8        5   40    35   1.62     59     $252K      $631K     $48K
+l40s           2        4    8    46   1.34     60     $142K      $252K     $48K
+a100-80gb      4        3   12   288   1.09     60     $358K      $568K     $48K
+h100-sxm       1        3    3    60   0.99     33     $161K      $237K     $48K
+h200           1        3    3   123   1.13     41     $181K      $315K     $48K
+rtx-pro-6000   1        5    5    48   1.89     59      $97K      $289K     $48K
+b200           1        2    2   163   0.46     33     $143K      $310K     $48K
+b300           1        2    2   253   0.47     47     $158K      $352K     $48K
 ```
 
 What the calculation shows:
 - at this volume an API is cheapest, but only if data may be sent to the provider;
-- among owned options, 8 × L40S is cheapest, while 3 × H100 costs a little more with three GPUs instead of eight;
+- among owned options, 5 × RTX PRO 6000 (a 96 GB Blackwell PCIe server card) is cheapest; 2 × B200 cost more but use two cards instead of five and reach the first token in 0.46 s;
 - long RAG prompts make prefill, not generation, the bottleneck; hence the value of prefix caching.
 
 | Scenario | Best owned option | Owned, 3 years | Cloud, 3 years | API, 3 years |
 |---|---|---|---|---|
-| RAG assistant, 2,000 employees, 32B INT4 | 8 × L40S | $142K | from $237K | $48K |
-| Agent platform, 300 users, 72B FP8 | 12 × H200 | $724K | from $1.26M | $192K |
-| Reviewing 5,000 documents a day, MoE 30B | 2 × A100 | $60K | from $34K | $114K |
+| RAG assistant, 2,000 employees, 32B INT4 | 5 × RTX PRO 6000 | $97K | from $237K | $48K |
+| Agent platform, 300 users, 72B FP8 | 3 × B200 | $214K | from $465K | $192K |
+| Reviewing 5,000 documents a day, MoE 30B | 2 × RTX PRO 6000 | $39K | from $34K | $114K |
 
 GPU, rental and API prices in `config/gpus.yaml` and the scenarios are **indicative**: replace them with current commercial quotes before any decision.
 
 ## Method
 
-**Memory.** Weights: parameters × bytes per parameter (FP16 2, FP8 1, INT4 0.5). KV cache per token: 2 × layers × KV heads × head size × bytes. Grouped-query attention shrinks the KV cache several times: Llama 3.1 70B needs 320 KB per token instead of 2.5 MB with all heads. The inference engine gets 90% of GPU memory, plus a per-GPU reserve.
+**Memory.** Weights: parameters × bytes per parameter (FP16 2, FP8 1, INT4 and FP4 about 0.5 plus group scales). KV cache per token: 2 × layers × KV heads × head size × bytes. Grouped-query attention shrinks the KV cache several times: Llama 3.1 70B needs 320 KB per token instead of 2.5 MB with all heads. For MLA (DeepSeek-V3) and other compressed-attention schemes the KV cache per token is set explicitly, in the model catalog or manually (`--kv-kb`). The inference engine gets 90% of GPU memory, plus a per-GPU reserve.
 
 **Generation (decode)** is memory-bandwidth bound: each step reads the weights and the KV cache of every request in the batch and emits one token per request. Batching therefore raises throughput almost for free until KV reads become comparable to weight reads. For MoE, the model accounts for more experts being touched as the batch grows.
 
-**Prompt processing (prefill)** is compute bound: about 2 × active parameters FLOPs per token.
+**Prompt processing (prefill)** is compute bound: about 2 × active parameters FLOPs per token, but no faster than one read of all weights. FP8 and FP4 weights use the tensor-core throughput of that format where the GPU supports it (FP4 only on Blackwell); INT4 and INT8 are treated as weight-only quantization computed in FP16. Prefix caching (`--prefix-cache`) shrinks the part of the prompt to process: agent loops repeat 80–90% of it.
 
 **Planning.** For TP = 1, 2, 4, 8: weights and KV cache must fit; the batch is the largest that meets the per-token target; replica throughput accounts for prefill pauses; replicas are derived from peak arrival rate and a 70% target utilization, plus a spare. Inter-GPU communication over PCIe costs more than over NVLink. The option with the fewest GPUs wins.
 
-**Cost.** Owned: GPUs and their share of the server, electricity with PUE, maintenance at 10% a year. Cloud: GPU rental around the clock or during working hours. API: price per input and output tokens. Staff costs are not included.
+**Cost.** Owned: GPUs and their share of the server, electricity with PUE, maintenance at 10% a year. Inter-server networking, storage and rack space can be added as a share of hardware cost (`--infra-share`). Cloud: hourly rental around the clock or during working hours, or a reservation for the whole term at a discount (`--cloud-reserved`). API: price per input, output and cached tokens. Staff costs are not included.
 
 ## Limitations
 
 - This is a roofline estimate with ±30–50% accuracy. A load test on vLLM with real prompts is needed before purchasing.
 - Efficiency factors (60% of memory bandwidth, 40% of compute) are typical for modern engines but depend on version, model and settings.
-- Prefix caching, speculative decoding and disaggregated prefill/decode are not modelled: they all improve results, so the estimate is conservative.
+- Prefix caching reduces prompt-processing time but not KV-cache memory. Speculative decoding and disaggregated prefill/decode are not modelled: they improve results, so the estimate is conservative.
 - Model parameters come from config.json; verify them for your model.
 - RTX 4090 is shown for comparison only: the GeForce driver licence does not allow datacenter deployment, so the card is excluded from recommendations.
 

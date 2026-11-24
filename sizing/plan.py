@@ -12,9 +12,9 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
-from .catalog import GPU, Model, Scenario
+from .catalog import KV_BYTES, GPU, Model, Scenario
 from .memory import kv_capacity_gb, kv_gb_per_sequence, weights_gb
 from .perf import prefill_s, tpot_s
 
@@ -42,7 +42,15 @@ class Plan:
     reasons: list[str] = field(default_factory=list)
 
 
+def effective_model(sc: Scenario, model: Model) -> Model:
+    """Модель с KV-кэшем на токен, заданным в сценарии вручную (MLA, сжатое внимание)."""
+    if sc.kv_kb_per_token > 0:
+        return replace(model, kv_bytes_per_token_fp16=round(sc.kv_kb_per_token * 1024 * 2 / KV_BYTES[sc.kv_dtype]))
+    return model
+
+
 def plan_for_tp(sc: Scenario, model: Model, gpu: GPU, tp: int) -> Plan:
+    model = effective_model(sc, model)
     p = Plan(gpu=gpu.name, feasible=False, tp=tp, peak_rps=sc.peak_rps)
     if model.attention_heads % tp:
         p.reasons.append(f"TP={tp}: число attention heads ({model.attention_heads}) не делится на {tp}")
@@ -73,7 +81,9 @@ def plan_for_tp(sc: Scenario, model: Model, gpu: GPU, tp: int) -> Plan:
             hi = mid - 1
     b = lo
     tpot = tpot_s(model, gpu, sc.quant, sc.kv_dtype, tp, b, avg_ctx)
-    pre = prefill_s(model, gpu, sc.quant, tp, sc.avg_prompt_tokens)
+    # Кэш префиксов: повторяющееся начало промпта (системная инструкция, история шагов агента)
+    # уже лежит в KV-кэше, и prefill считается только для новой части
+    pre = prefill_s(model, gpu, sc.quant, tp, sc.avg_prompt_tokens * (1 - sc.prefix_cache_hit))
     mu = b / (sc.avg_output_tokens * tpot + b * pre)
     # Время до первого токена: свой prefill плюс ожидание prefill-ов, пришедших раньше
     rho_prefill = min(mu * sc.target_utilization * pre, 0.95)

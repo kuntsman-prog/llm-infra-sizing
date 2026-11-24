@@ -8,8 +8,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 
-BYTES_PER_PARAM = {"fp16": 2.0, "bf16": 2.0, "fp8": 1.0, "int8": 1.0, "int4": 0.5}
-QUANT_OVERHEAD = {"int4": 1.05}  # масштабы и нули групповой квантизации (AWQ, GPTQ)
+BYTES_PER_PARAM = {"fp16": 2.0, "bf16": 2.0, "fp8": 1.0, "int8": 1.0, "int4": 0.5, "fp4": 0.5}
+QUANT_OVERHEAD = {"int4": 1.05, "fp4": 1.125}  # масштабы групповой квантизации: AWQ/GPTQ; у NVFP4 масштаб FP8 на каждые 16 весов
 KV_BYTES = {"fp16": 2, "bf16": 2, "fp8": 1}
 
 
@@ -25,6 +25,7 @@ class Model:
     max_context: int
     experts: int = 0
     experts_per_token: int = 0
+    kv_bytes_per_token_fp16: int = 0   # для MLA и других сжатых схем внимания: KV-кэш на токен в FP16, задаётся явно
 
     @property
     def is_moe(self) -> bool:
@@ -43,6 +44,8 @@ class GPU:
     cloud_usd_per_hour: float
     interconnect: str = "pcie"
     production: bool = True
+    fp8_tflops: float = 0              # 0: нет аппаратной поддержки FP8, вычисления идут в FP16
+    fp4_tflops: float = 0              # 0: нет аппаратной поддержки FP4 (есть только у Blackwell)
     note: str = ""
 
 
@@ -68,6 +71,9 @@ class Scenario:
     gpus: list[str] = field(default_factory=list)
     api_usd_per_m_input: float | None = None   # цена API для класса модели сценария
     api_usd_per_m_output: float | None = None
+    api_usd_per_m_cached: float | None = None  # цена кэшированных входных токенов у провайдера; по умолчанию как обычных
+    prefix_cache_hit: float = 0.0           # доля промпта, которая берётся из кэша префиксов (повторяющееся начало промпта)
+    kv_kb_per_token: float = 0.0            # KV-кэш на токен, КБ, если задан вручную (MLA, сжатое внимание)
 
     @property
     def peak_rps(self) -> float:
@@ -108,6 +114,10 @@ def validate(sc: Scenario) -> Scenario:
         raise ValueError("доля трафика в пиковый час должна быть от 0 до 1")
     if not 0 < sc.target_utilization <= 1:
         raise ValueError("целевая загрузка должна быть от 0 до 1")
+    if not 0 <= sc.prefix_cache_hit < 1:
+        raise ValueError("доля промпта из кэша префиксов должна быть от 0 до 0,99")
+    if sc.kv_kb_per_token < 0:
+        raise ValueError("KV-кэш на токен не может быть отрицательным")
     if sc.quant not in BYTES_PER_PARAM:
         raise ValueError(f"неизвестная квантизация {sc.quant}, допустимо: {sorted(BYTES_PER_PARAM)}")
     if sc.kv_dtype not in KV_BYTES:

@@ -1,6 +1,7 @@
 # Паспортные характеристики GPU (ориентировочно) и экономика.
 # vram_gb: память; bandwidth_tbs: пропускная способность памяти, ТБ/с;
-# fp16_tflops: плотная производительность FP16/BF16 на тензорных ядрах без учёта разреженности;
+# fp16_tflops, fp8_tflops, fp4_tflops: плотная производительность тензорных ядер без учёта разреженности;
+#   0 у fp8/fp4 означает, что формат не поддерживается аппаратно и вычисления идут в FP16;
 # tdp_w: потребление; interconnect: nvlink или pcie (связь GPU внутри сервера);
 # production: false, если карта не подходит для промышленного размещения в ЦОД.
 # ЦЕНЫ ОРИЕНТИРОВОЧНЫЕ и зависят от рынка, поставщика и страны. Перед любым решением
@@ -12,6 +13,7 @@ gpus:
     vram_gb: 24
     bandwidth_tbs: 1.0
     fp16_tflops: 165
+    fp8_tflops: 330
     tdp_w: 450
     price_usd: 2000
     platform_usd_per_gpu: 1500
@@ -23,6 +25,7 @@ gpus:
     vram_gb: 24
     bandwidth_tbs: 0.3
     fp16_tflops: 121
+    fp8_tflops: 242
     tdp_w: 72
     price_usd: 3000
     platform_usd_per_gpu: 1500
@@ -32,6 +35,7 @@ gpus:
     vram_gb: 48
     bandwidth_tbs: 0.864
     fp16_tflops: 362
+    fp8_tflops: 733
     tdp_w: 350
     price_usd: 9000
     platform_usd_per_gpu: 3000
@@ -50,6 +54,7 @@ gpus:
     vram_gb: 80
     bandwidth_tbs: 3.35
     fp16_tflops: 989
+    fp8_tflops: 1979
     tdp_w: 700
     price_usd: 30000
     platform_usd_per_gpu: 8000
@@ -59,11 +64,48 @@ gpus:
     vram_gb: 141
     bandwidth_tbs: 4.8
     fp16_tflops: 989
+    fp8_tflops: 1979
     tdp_w: 700
     price_usd: 35000
     platform_usd_per_gpu: 8000
     cloud_usd_per_hour: 4.0
     interconnect: nvlink
+
+  rtx-pro-6000:
+    vram_gb: 96
+    bandwidth_tbs: 1.6
+    fp16_tflops: 500
+    fp8_tflops: 1000
+    fp4_tflops: 2000
+    tdp_w: 600
+    price_usd: 9000
+    platform_usd_per_gpu: 3000
+    cloud_usd_per_hour: 2.2
+    interconnect: pcie
+    note: RTX PRO 6000 Blackwell Server Edition, пассивное охлаждение для серверов
+  b200:
+    vram_gb: 180
+    bandwidth_tbs: 7.7
+    fp16_tflops: 2250
+    fp8_tflops: 4500
+    fp4_tflops: 9000
+    tdp_w: 1000
+    price_usd: 40000
+    platform_usd_per_gpu: 10000
+    cloud_usd_per_hour: 5.9
+    interconnect: nvlink
+  b300:
+    vram_gb: 268
+    bandwidth_tbs: 8.0
+    fp16_tflops: 2250
+    fp8_tflops: 4500
+    fp4_tflops: 13500
+    tdp_w: 1200
+    price_usd: 45000
+    platform_usd_per_gpu: 10000
+    cloud_usd_per_hour: 6.7
+    interconnect: nvlink
+    note: Blackwell Ultra; 268 ГБ доступной памяти HBM3e
 
 economics:
   years: 3
@@ -71,6 +113,9 @@ economics:
   pue: 1.5                    # энергоэффективность ЦОД
   server_power_overhead: 1.6  # CPU, память, сеть, вентиляторы относительно TDP GPU
   maintenance_share_per_year: 0.10
+  infra_share: 0.0            # сеть между серверами, СХД и размещение как доля стоимости оборудования
+  cloud_reserved: false       # true: облако зарезервировано на весь срок (оплата круглосуточно со скидкой)
+  reserved_discount: 0.30     # скидка за резервирование относительно почасовой цены
   # Цена API за 1 млн токенов по умолчанию, ориентир для моделей класса 30B;
   # в сценарии можно задать свою цену под класс модели. Подставьте цены провайдера.
   api_usd_per_m_input: 0.50
